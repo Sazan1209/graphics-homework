@@ -10,14 +10,15 @@
 #include "shaders/UniformParams.h"
 #include "wsi/OsWindowingManager.hpp"
 
-class App {
- public:
+class App
+{
+public:
   App();
   ~App();
 
   void run();
 
- private:
+private:
   void drawFrame();
   void updateParams();
   void getInput();

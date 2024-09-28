@@ -1,7 +1,7 @@
 #ifndef UNIFORM_PARAMS_H_INCLUDED
 #define UNIFORM_PARAMS_H_INCLUDED
 
-//#include "cpp_glsl_compat.h"
+// #include "cpp_glsl_compat.h"
 
 #ifndef SHADER_COMMON_H_INCLUDED
 #define SHADER_COMMON_H_INCLUDED
@@ -52,9 +52,10 @@ using shader_bool = glm::uint;
 
 // NOLINTEND
 
-#endif  // SHADER_COMMON_H_INCLUDED
+#endif // SHADER_COMMON_H_INCLUDED
 
-struct UniformParams {
+struct UniformParams
+{
   shader_mat4 camera;
   shader_vec4 cam_pos;
   shader_vec4 lightPos;
@@ -62,4 +63,4 @@ struct UniformParams {
   shader_float time;
 };
 
-#endif  // UNIFORM_PARAMS_H_INCLUDED
+#endif // UNIFORM_PARAMS_H_INCLUDED
