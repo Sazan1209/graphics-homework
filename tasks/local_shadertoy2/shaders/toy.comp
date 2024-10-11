@@ -1,0 +1,369 @@
+#version 430
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_GOOGLE_include_directive : require
+
+#include "UniformParams.h"
+
+layout(local_size_x = 32, local_size_y = 32) in;
+layout(binding = 0, rgba8) uniform image2D resultImage;
+
+layout(push_constant) uniform params { UniformParams uni_params; };
+
+// struct UniformParams
+// {
+//     shader_mat3 camera;
+//     shader_vec3 cam_pos;
+//     shader_vec3 lightPos;
+//     shader_float time;
+//     shader_vec2 resolution;
+// };
+
+const float pi = 3.1415926535897932384626433;
+
+float vecMin(in vec3 p) { return min(p.x, min(p.y, p.z)); }
+
+float vecMin(in vec2 p) { return min(p.x, p.y); }
+
+mat3 yaw(in float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return mat3(c, s, 0, -s, c, 0, 0, 0, 1);
+}
+
+mat3 pitch(in float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return mat3(1, 0, 0, 0, c, s, 0, -s, c);
+}
+
+mat3 roll(in float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return mat3(c, 0, s, 0, 1, 0, -s, 0, c);
+}
+
+float sdCube(in vec3 p, in vec3 param) {
+  vec3 dim = param / 2.0;
+  p = abs(p);
+  vec3 d = p - dim;
+  d = max(d, vec3(0.0));
+  float l = length(d);
+  if (abs(l) <= 0.0001) {
+    return -vecMin(dim - p);
+  }
+  return l;
+}
+
+////////////////////////////////////////////////////////
+
+float sdRectangle(in vec2 p, in vec2 param) {
+  vec2 dim = param / 2.0;
+  p = abs(p);
+  vec2 d = p - dim;
+  d = max(d, vec2(0.0, 0.0));
+  float l = length(d);
+  if (abs(l) <= 0.0001) {
+    return -vecMin(dim - p);
+  }
+  return l;
+}
+
+float sdCyllinder(in vec3 p, in vec2 param) {
+  return sdRectangle(vec2(length(p.xy), p.z), param);
+}
+
+////////////////////////////////////////////////////////
+
+float sdCircle(in vec2 p, in float param) { return length(p) - param; }
+
+float sum(in vec3 p) { return dot(p, vec3(1, 1, 1)); }
+
+float sum(in vec2 p) { return dot(p, vec2(1, 1)); }
+
+float sdSphere(in vec3 p, in float r) { return length(p) - r; }
+
+struct material {
+  vec3 color;
+  float roughness;
+};
+
+// clang-format off
+
+#define BEGIN_GROUP()       \
+{                           \
+  float l0 = l;             \
+  vec3 p0 = p;              \
+  float total_scale0 = 1.0; \
+  int material0 = 0;
+
+#define BEGIN_FIG()           \
+  {                           \
+    vec3 p0 = p0;             \
+    float total_scale0 = 1.0; \
+    float smooth0 = 0.0;
+
+#define F_YAW(angle) p0 = transpose(yaw(angle)) * p0;
+
+#define F_PITCH(angle) p0 = transpose(pitch(angle)) * p0;
+
+#define F_ROLL(angle) p0 = transpose(roll(angle)) * p0;
+
+#define F_SCALE(scale) \
+  p0 /= scale;         \
+  total_scale0 *= scale;
+
+#define F_SMOOTH(smooth) smooth0 = smooth;
+
+#define F_SHIFT(x, y, z) p0 -= vec3(x, y, z);
+
+#define END_FIG(sdF, param)                              \
+    float tmp = sdF(p0, param) * total_scale0 - smooth0; \
+    if (tmp < l0) {                                      \
+      l0 = tmp;                                          \
+      material0 = 0;                                     \
+    }                                                    \
+  }
+
+#define END_FIG_MAT(sdF, param, num)                   \
+    float tmp = sdF(p0, param) * total_scale0 - smooth0; \
+    if (tmp < l0) {                                      \
+      l0 = tmp;                                          \
+      material0 = num;                                   \
+    }                                                    \
+  }
+
+#define END_GROUP()      \
+  l0 *= total_scale0;    \
+  if (l0 < l) {          \
+    l = l0;              \
+    mat_num = material0; \
+  }                      \
+}
+
+#define BEGIN_MAT(num) if (mat_num == num) {
+#define COLOR(x, y, z) mat.color = vec3(x, y, z) / 100.0;
+
+#define ROUGH(x) mat.roughness = float(x);
+
+#define END_MAT() }
+
+// clang-format on
+
+float sdE(in vec3 p, out material mat) {
+  float l = 10000.0;
+  mat = material(vec3(1, 1, 1), 2.0);
+  int mat_num = 0;
+  BEGIN_GROUP()
+
+  // Floor
+  BEGIN_FIG()
+  F_SHIFT(0, 0, -5)
+  END_FIG(sdCube, vec3(15, 15, 1))
+
+  // Podium + main pole
+  BEGIN_FIG()
+  F_SHIFT(0, 0, -4.5)
+  END_FIG_MAT(sdCyllinder, vec2(3.5, 1), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(0, 0, -3.)
+  END_FIG_MAT(sdCyllinder, vec2(.5, 2), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(0, 0, -1.0)
+  END_FIG_MAT(sdSphere, 1.0, 2)
+
+  END_GROUP()
+
+  // Planet 1
+  BEGIN_GROUP()
+  F_YAW(uni_params.time)
+  BEGIN_FIG()
+  F_SHIFT(3.25, 0, -3.75)
+  F_ROLL(pi / 2.0)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 6), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25 + 4.0, 0.0, -2.25 + 0.375 - 1.5)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25 + 4.0, 0.0, -1.0 - 1.5)
+  END_FIG_MAT(sdSphere, .4, 6)
+
+  END_GROUP()
+
+  // Planet 2
+  BEGIN_GROUP()
+  F_YAW(-uni_params.time / 2.0)
+  BEGIN_FIG()
+  F_SHIFT(2.75 - .3333 / 2.0, 0, -3.25)
+  F_ROLL(pi / 2.0)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 4.6666), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25 + 2.6666, 0.0, -2.25 + 0.375 - 1.0)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25 + 2.6666, 0.0, -1.0 - 1.0)
+  END_FIG_MAT(sdSphere, .7, 5)
+  END_GROUP()
+
+  // Planet 3
+  BEGIN_GROUP()
+
+  F_YAW(-uni_params.time)
+  BEGIN_FIG()
+  F_SHIFT(2.25 - .33333, 0, -2.75)
+  F_ROLL(pi / 2.0)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 3.3333), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25 + 1.3333, 0.0, -2.25 + 0.375 - .5)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25 + 1.3333, 0.0, -1.0 - .5)
+  END_FIG_MAT(sdSphere, .5, 4)
+
+  END_GROUP()
+
+  // Planet 4
+  BEGIN_GROUP()
+
+  F_YAW(uni_params.time * 1.5)
+  BEGIN_FIG()
+  F_SHIFT(1.25, 0, -2.25)
+  F_ROLL(pi / 2.0)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 2), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25, 0.0, -2.25 + 0.375)
+  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+
+  BEGIN_FIG()
+  F_SHIFT(2.25, 0.0, -1.0)
+  END_FIG_MAT(sdSphere, .5, 3)
+  END_GROUP()
+
+  BEGIN_MAT(1)
+  COLOR(80, 50, 20)
+  END_MAT()
+
+  BEGIN_MAT(2)
+  COLOR(100, 92, 0)
+  ROUGH(50)
+  END_MAT()
+
+  BEGIN_MAT(3)
+  COLOR(0, 8, 100)
+  ROUGH(50)
+  END_MAT()
+
+  BEGIN_MAT(4)
+  COLOR(100, 0, 8)
+  ROUGH(50)
+  END_MAT()
+
+  BEGIN_MAT(5)
+  COLOR(0, 100, 92)
+  ROUGH(50)
+  END_MAT()
+
+  BEGIN_MAT(6)
+  COLOR(8, 100, 0)
+  ROUGH(50)
+  END_MAT()
+
+  return l;
+}
+
+float sdE(vec3 p) {
+  material mat;
+  return sdE(p, mat);
+}
+
+#define MAX_ITERS 90
+#define MAX_DIST 100.0
+vec3 trace(vec3 from, vec3 dir, out bool hit, out material mat) {
+  vec3 p = from;
+  float totalDist = 0.0;
+
+  hit = false;
+
+  for (int steps = 0; steps < MAX_ITERS; steps++) {
+    float dist = sdE(p, mat);
+
+    if (dist < 0.01) {
+      hit = true;
+      break;
+    }
+
+    totalDist += dist;
+
+    if (totalDist > MAX_DIST) break;
+
+    p += dist * dir;
+  }
+
+  return p;
+}
+
+vec3 generateNormal(vec3 z, float d) {
+  float e = max(d * 0.5, 0.0001);
+  float dx1 = sdE(z + vec3(e, 0, 0));
+  float dx2 = sdE(z - vec3(e, 0, 0));
+  float dy1 = sdE(z + vec3(0, e, 0));
+  float dy2 = sdE(z - vec3(0, e, 0));
+  float dz1 = sdE(z + vec3(0, 0, e));
+  float dz2 = sdE(z - vec3(0, 0, e));
+
+  return normalize(vec3(dx1 - dx2, dy1 - dy2, dz1 - dz2));
+}
+
+float calculate_light(in vec3 p, float shine) {
+  vec3 light_v = normalize(uni_params.lightPos.xyz - p);
+  bool hit;
+  material mat;
+  float ambient = 0.2;
+  trace(p + light_v * 0.1, light_v, hit, mat);
+  if (hit) {
+    return ambient;
+  }
+  vec3 normal = generateNormal(p, 0.001);
+  vec3 eye_v = normalize(uni_params.cam_pos.xyz - p);
+  float diffuse = max(0.0, dot(normal, light_v));
+  vec3 refract_v = normalize(eye_v + light_v);
+  float highlight = max(0.0, dot(refract_v, normal));
+  return diffuse + pow(highlight, shine) + ambient;
+}
+
+vec3 screen_to_world(in vec2 screen) {
+  vec2 sc = (screen - uni_params.resolution.xy * 0.5);
+  return mat3(uni_params.camera) * vec3(sc, 1);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec3 p = screen_to_world(fragCoord);
+
+  bool hit;
+  material mat;
+  p = trace(p, normalize(p - uni_params.cam_pos.xyz), hit, mat);
+  if (hit) {
+    float l = calculate_light(p, mat.roughness);
+    fragColor = vec4(mat.color * l, 1.0);
+  } else {
+    fragColor = vec4(0.1, 0.1, 1.0, 1.0);
+  }
+}
+
+void main() {
+  ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+  if (!(float(uv.x) < uni_params.resolution.x &&
+        float(uv.y) < uni_params.resolution.y))
+    return;
+  vec4 color = vec4(1, 1, 1, 1);
+  mainImage(color, vec2(uv));
+  imageStore(resultImage, uv, color);
+}
