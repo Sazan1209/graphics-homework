@@ -88,17 +88,7 @@ App::App()
   // Next, we need a magical Etna helper to send commands to the GPU.
   // How it is actually performed is not trivial, but we can skip this for now.
   commandManager = etna::get_context().createPerFrameCmdMgr();
-
-  auto& ctx = etna::get_context();
-
   // Alloc resources
-
-  auto storageImage = ctx.createImage(etna::Image::CreateInfo{
-    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
-    .name = "storage",
-    .format = vk::Format::eR8G8B8A8Srgb,
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-  });
 
   etna::create_program("comp", {LOCAL_SHADERTOY_SHADERS_ROOT "toy.comp.spv"});
 
@@ -108,9 +98,8 @@ App::App()
   storage = etna::get_context().createImage(etna::Image::CreateInfo{
     .extent = vk::Extent3D{resolution.x, resolution.y, 1},
     .name = "storage",
-    .format = vk::Format::eR8G8B8A8Snorm,
-    .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc |
-      vk::ImageUsageFlagBits::eSampled});
+    .format = vk::Format::eR8G8B8A8Unorm,
+    .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc});
 
   defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
 }
@@ -221,7 +210,7 @@ void App::drawFrame()
 
       etna::flush_barriers(currentCmdBuf);
 
-      currentCmdBuf.dispatch((resolution.x - 1) / 32 + 1, (resolution.y - 1) / 32 + 1, 1);
+      currentCmdBuf.dispatch((resolution.x + 31) / 32 + 1, (resolution.y + 31) / 32 + 1, 1);
 
       etna::flush_barriers(currentCmdBuf);
       // Change layout
