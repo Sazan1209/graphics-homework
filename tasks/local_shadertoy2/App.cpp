@@ -1,4 +1,5 @@
 #include "App.hpp"
+#include "Alignstd430.hpp"
 
 #include <etna/Etna.hpp>
 #include <etna/GlobalContext.hpp>
@@ -154,11 +155,10 @@ void App::updateParams()
 
   mat[2] += pos;
   params.camera = mat;
-  assert(params.camera[0] == glm::vec4(mat[0], 0));
   params.cam_pos = glm::vec4{pos, 0};
-  params.lightPos = {0, -5, 5, 0};
+  params.lightPos = {0, -5, 5};
   params.time = time;
-  params.resolution = glm::vec4{resolution, 0, 0};
+  params.resolution = resolution;
 }
 
 void App::drawFrame()
@@ -205,8 +205,11 @@ void App::drawFrame()
       currentCmdBuf.bindDescriptorSets(
         vk::PipelineBindPoint::eCompute, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
 
-      currentCmdBuf.pushConstants<UniformParams>(
-        pipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, {params});
+      AlignedBuffer<UniformParams> buf;
+      memcpy_aligned_std430(buf, params);
+
+      currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
+        pipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, {buf});
 
       etna::flush_barriers(currentCmdBuf);
 
