@@ -1,6 +1,6 @@
 #pragma once
 
-#include <etna/ComputePipeline.hpp>
+#include <etna/GraphicsPipeline.hpp>
 #include <etna/Image.hpp>
 #include <etna/PerFrameCmdMgr.hpp>
 #include <etna/Sampler.hpp>
@@ -36,8 +36,6 @@ private:
 
   std::unique_ptr<etna::Window> vkWindow;
   std::unique_ptr<etna::PerFrameCmdMgr> commandManager;
-
-  etna::Image storage;
-  etna::ComputePipeline pipe;
+  etna::GraphicsPipeline pipe;
   etna::Sampler defaultSampler;
 };

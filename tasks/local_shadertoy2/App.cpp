@@ -4,6 +4,7 @@
 #include <etna/Etna.hpp>
 #include <etna/GlobalContext.hpp>
 #include <etna/PipelineManager.hpp>
+#include <etna/RenderTargetStates.hpp>
 
 static glm::mat3 yaw(float angle)
 {
@@ -91,17 +92,16 @@ App::App()
   commandManager = etna::get_context().createPerFrameCmdMgr();
   // Alloc resources
 
-  etna::create_program("comp", {LOCAL_SHADERTOY2_SHADERS_ROOT "toy.comp.spv"});
+  etna::create_program(
+    "toy",
+    {LOCAL_SHADERTOY2_SHADERS_ROOT "toy.frag.spv", LOCAL_SHADERTOY2_SHADERS_ROOT "quad.vert.spv"});
 
   auto& pipelineManager = etna::get_context().getPipelineManager();
 
-  pipe = pipelineManager.createComputePipeline("comp", {});
-  storage = etna::get_context().createImage(etna::Image::CreateInfo{
-    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
-    .name = "storage",
-    .format = vk::Format::eR8G8B8A8Unorm,
-    .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc});
-
+  pipe = pipelineManager.createGraphicsPipeline(
+    "toy",
+    etna::GraphicsPipeline::CreateInfo{
+      .fragmentShaderOutput = {.colorAttachmentFormats = {vk::Format::eB8G8R8A8Srgb}}});
   defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
 }
 
@@ -143,22 +143,28 @@ void App::getInput()
 
 void App::updateParams()
 {
-  float pi2 = 3.1415926535897932384626433f * 2.0f;
+  constexpr float pi = 3.1415926535897932384626433f;
+  constexpr float fov = pi * 4.0f / 12.0f; // 75 degrees
+  constexpr float dist = 0.8f;
+
+  glm::vec3 depth = glm::vec3{0, 1, 0} * dist;
+  float ratio = static_cast<float>(resolution.y) / static_cast<float>(resolution.x);
+  glm::vec3 plane_x = glm::vec3{1, 0, 0} * std::tan(fov / 2.0f) * 2.0f;
+  glm::vec3 plane_z = glm::vec3{0, 0, -1} * std::tan(fov / 2.0f) * ratio * 2.0f;
+  glm::vec3 start = depth - 0.5f * (plane_x + plane_z);
+
   auto coef = mouse / glm::vec2(resolution);
-  glm::mat3 rotation = yaw(coef.x * pi2) * pitch(-pi2 / 12.0f);
-  glm::vec3 start = {0, 0.8, 0};
-  float area = glm::sqrt(static_cast<float>(resolution.x * resolution.y));
-  glm::vec3 plane_x = {0.5 / area, 0, 0};
-  glm::vec3 plane_z = {0, 0, -0.5 / area};
+  float angle = coef.x * pi * 2.0f;
+  glm::mat3 rotation = yaw(angle) * pitch(-pi / 6.0f);
+
   glm::mat3 mat = rotation * glm::mat3(plane_x, plane_z, start);
-  glm::vec3 pos = {30.0 * sin(coef.x * pi2), -30.0 * cos(coef.x * pi2), 15.0};
+  glm::vec3 pos = {15.0f * sin(angle), -15.0f * cos(angle), 7.5f};
 
   mat[2] += pos;
   params.camera = mat;
   params.cam_pos = glm::vec4{pos, 0};
   params.lightPos = {0, -5, 5};
   params.time = time;
-  params.resolution = resolution;
 }
 
 void App::drawFrame()
@@ -181,95 +187,32 @@ void App::drawFrame()
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
 
     {
-      // Init
-      etna::set_state(
-        currentCmdBuf,
-        storage.get(),
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::AccessFlagBits2::eShaderWrite,
-        vk::ImageLayout::eGeneral,
-        vk::ImageAspectFlagBits::eColor);
       etna::flush_barriers(currentCmdBuf);
+      {
 
-      // Pipeline
+        etna::RenderTargetState state(
+          currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
 
-      auto storageBinding = storage.genBinding(defaultSampler.get(), vk::ImageLayout::eGeneral);
-      auto info = etna::get_shader_program("comp");
+        // auto info = etna::get_shader_program("toy");
+        //  auto descriptorSet =
+        //    etna::create_descriptor_set(info.getDescriptorLayoutId(0), currentCmdBuf, {});
+        //  auto vkSet = descriptorSet.getVkSet();
 
-      auto descriptorSet = etna::create_descriptor_set(
-        info.getDescriptorLayoutId(0), currentCmdBuf, {etna::Binding{0, storageBinding}});
+        currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipe.getVkPipeline());
+        // currentCmdBuf.bindDescriptorSets(
+        //   vk::PipelineBindPoint::eGraphics, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0,
+        //   nullptr);
 
-      auto vkSet = descriptorSet.getVkSet();
+        AlignedBuffer<UniformParams> buf{};
+        memcpy_aligned_std430(buf, params);
 
-      currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, pipe.getVkPipeline());
-      currentCmdBuf.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
+        currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
+          pipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
 
-      AlignedBuffer<UniformParams> buf;
-      memcpy_aligned_std430(buf, params);
+        currentCmdBuf.draw(3, 1, 0, 0);
+      }
 
-      currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
-        pipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, {buf});
 
-      etna::flush_barriers(currentCmdBuf);
-
-      currentCmdBuf.dispatch((resolution.x + 31) / 32 + 1, (resolution.y + 31) / 32 + 1, 1);
-
-      etna::flush_barriers(currentCmdBuf);
-      // Change layout
-
-      etna::set_state(
-        currentCmdBuf,
-        storage.get(),
-        vk::PipelineStageFlagBits2::eBlit,
-        vk::AccessFlagBits2::eTransferRead,
-        vk::ImageLayout::eGeneral,
-        vk::ImageAspectFlagBits::eColor);
-      etna::set_state(
-        currentCmdBuf,
-        backbuffer,
-        vk::PipelineStageFlagBits2::eBlit,
-        vk::AccessFlagBits2::eTransferWrite,
-        vk::ImageLayout::eTransferDstOptimal,
-        vk::ImageAspectFlagBits::eColor);
-      etna::flush_barriers(currentCmdBuf);
-
-      // Blit
-      std::array<vk::Offset3D, 2> srcOffset = {
-        vk::Offset3D{},
-        vk::Offset3D{static_cast<int32_t>(resolution.x), static_cast<int32_t>(resolution.y), 1}};
-      auto srdImageSubrecourceLayers = vk::ImageSubresourceLayers{
-        .aspectMask = vk::ImageAspectFlagBits::eColor,
-        .mipLevel = 0,
-        .baseArrayLayer = 0,
-        .layerCount = 1};
-
-      // Destination info
-      std::array<vk::Offset3D, 2> dstOffset = {
-        vk::Offset3D{},
-        vk::Offset3D{static_cast<int32_t>(resolution.x), static_cast<int32_t>(resolution.y), 1}};
-
-      auto dstImageSubrecourceLayers = vk::ImageSubresourceLayers{
-        .aspectMask = vk::ImageAspectFlagBits::eColor,
-        .mipLevel = 0,
-        .baseArrayLayer = 0,
-        .layerCount = 1};
-      // Create blit info
-      auto imageBlit = vk::ImageBlit{
-        .srcSubresource = srdImageSubrecourceLayers,
-        .srcOffsets = srcOffset,
-        .dstSubresource = dstImageSubrecourceLayers,
-        .dstOffsets = dstOffset};
-
-      currentCmdBuf.blitImage(
-        storage.get(),
-        vk::ImageLayout::eGeneral,
-        backbuffer,
-        vk::ImageLayout::eTransferDstOptimal,
-        1,
-        &imageBlit,
-        vk::Filter::eLinear);
-      etna::flush_barriers(currentCmdBuf);
       etna::set_state(
         currentCmdBuf,
         backbuffer,

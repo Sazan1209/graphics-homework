@@ -124,19 +124,21 @@ constexpr size_t baseAlign<T[N]> = baseAlign<T>;
 template <glsl_mat T>
 constexpr size_t baseAlign<T> = baseAlign<typename T::row_type>;
 
-constexpr size_t max_size(){
-    return 0;
+constexpr size_t max_size()
+{
+  return 0;
 }
 
 template <typename... Ts>
-constexpr size_t max_size(size_t s1, Ts... ts){
-    return std::max(s1, max_size(ts...));
+constexpr size_t max_size(size_t s1, Ts... ts)
+{
+  return std::max(s1, max_size(ts...));
 }
 
 template <typename Tup, size_t... indices>
 constexpr size_t tuple_align_max(std::integer_sequence<size_t, indices...>)
 {
-    return max_size(baseAlign<std::tuple_element_t<indices, Tup>>...);
+  return max_size(baseAlign<std::tuple_element_t<indices, Tup>>...);
 }
 
 template <typename T>
@@ -160,7 +162,7 @@ size_t memcpy_std430(char* buf, size_t offset, T& val)
 {
   offset = round_up_to(offset, baseAlign<T>);
   memcpy(buf + offset, &val, sizeof(val)); // Probably illegal
-  return offset + sizeof(val);
+  return offset + baseAlign<T>;
 }
 
 template <typename T, size_t N>
