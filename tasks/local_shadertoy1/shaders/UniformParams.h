@@ -1,13 +1,17 @@
+#ifndef UNIFORM_PARAMS_H_INCLUDED
+#define UNIFORM_PARAMS_H_INCLUDED
+
+// #include "cpp_glsl_compat.h"
+
 #ifndef SHADER_COMMON_H_INCLUDED
 #define SHADER_COMMON_H_INCLUDED
 
-// NOTE: .h extension is used for files that can be included both into GLSL and into C++
-// GLSL-C++ datatype compatibility layer
+// NOTE: .h extension is used for files that can be included both into GLSL and
+// into C++ GLSL-C++ datatype compatibility layer
 
 #ifdef __cplusplus
 
 #include <glm/glm.hpp>
-
 
 // NOLINTBEGIN
 
@@ -49,3 +53,14 @@ using shader_bool = glm::uint;
 // NOLINTEND
 
 #endif // SHADER_COMMON_H_INCLUDED
+
+struct UniformParams
+{
+  shader_mat4 camera;
+  shader_vec4 cam_pos;
+  shader_vec4 lightPos;
+  shader_vec4 resolution;
+  shader_float time;
+};
+
+#endif // UNIFORM_PARAMS_H_INCLUDED
