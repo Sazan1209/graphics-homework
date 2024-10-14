@@ -62,71 +62,77 @@ App::App()
     .resolution = resolution,
   });
 
-  // But we also need to hook the OS window up to Vulkan manually!
+  //
   {
-    // First, we ask GLFW to provide a "surface" for the window,
-    // which is an opaque description of the area where we can actually render.
     auto surface = osWindow->createVkSurface(etna::get_context().getInstance());
-
-    // Then we pass it to Etna to do the complicated work for us
     vkWindow = etna::get_context().createWindow(etna::Window::CreateInfo{
       .surface = std::move(surface),
     });
-
-    // And finally ask Etna to create the actual swapchain so that we can
-    // get (different) images each frame to render stuff into.
-    // Here, we do not support window resizing, so we only need to call this
-    // once.
     auto [w, h] = vkWindow->recreateSwapchain(etna::Window::DesiredProperties{
       .resolution = {resolution.x, resolution.y},
       .vsync = useVsync,
     });
-
-    // Technically, Vulkan might fail to initialize a swapchain with the
-    // requested resolution and pick a different one. This, however, does not
-    // occur on platforms we support. Still, it's better to follow the
-    // "intended" path.
     resolution = {w, h};
   }
 
-  // Next, we need a magical Etna helper to send commands to the GPU.
-  // How it is actually performed is not trivial, but we can skip this for now.
   commandManager = etna::get_context().createPerFrameCmdMgr();
-  // Alloc resources
 
+  // Upload texture
+  {
+    int x, y, n;
+    auto maybeData = stbi_load(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/brass.png", &x, &y, &n, 4);
+    assert(maybeData != nullptr && "couldn't read brass texture\n");
+    auto data = reinterpret_cast<std::byte*>(maybeData);
+
+    etna::BlockingTransferHelper helper({.stagingSize = static_cast<vk::DeviceSize>(x * y * 4)});
+    brassTexture = etna::get_context().createImage(etna::Image::CreateInfo{
+      .extent = vk::Extent3D{static_cast<uint32_t>(x), static_cast<uint32_t>(y), 1},
+      .name = "brassTexture",
+      .format = vk::Format::eR8G8B8A8Unorm,
+      .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+        vk::ImageUsageFlagBits::eTransferDst,
+    });
+    helper.uploadImage(
+      *etna::get_context().createOneShotCmdMgr(),
+      brassTexture,
+      0,
+      0,
+      {data, static_cast<size_t>(x * y * 4)});
+    stbi_image_free(data);
+  }
+
+  // Alloc buffer for proc texture
+
+  procTexBuffer = etna::get_context().createImage(etna::Image::CreateInfo{
+    .extent = vk::Extent3D{256, 256, 1},
+    .name = "procTexBuffer",
+    .format = vk::Format::eB8G8R8A8Srgb,
+    .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eColorAttachment,
+  });
+
+  // Compile pipelines
   etna::create_program(
     "toy",
     {LOCAL_SHADERTOY2_SHADERS_ROOT "toy.frag.spv", LOCAL_SHADERTOY2_SHADERS_ROOT "quad.vert.spv"});
 
   auto& pipelineManager = etna::get_context().getPipelineManager();
-  int x, y, n;
-  auto maybeData =
-    stbi_load(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/brass.png", &x, &y, &n, 4);
-  assert(maybeData != nullptr && "couldn't read brass texture\n");
-  auto data = reinterpret_cast<std::byte*>(maybeData);
-
-
-  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.addressMode = vk::SamplerAddressMode::eRepeat, .name = "default_sampler"});
-
-  etna::BlockingTransferHelper helper({.stagingSize = static_cast<vk::DeviceSize>(x * y * 4)});
-  brassTexture = etna::get_context().createImage(etna::Image::CreateInfo{
-    .extent = vk::Extent3D{static_cast<uint32_t>(x), static_cast<uint32_t>(y), 1},
-    .name = "brassTexture",
-    .format = vk::Format::eR8G8B8A8Unorm,
-      .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-  });
-  helper.uploadImage(
-    *etna::get_context().createOneShotCmdMgr(),
-    brassTexture,
-    0,
-    0,
-    {data, static_cast<size_t>(x * y * 4)});
-
-
-  pipe = pipelineManager.createGraphicsPipeline(
+  mainPipeline = pipelineManager.createGraphicsPipeline(
     "toy",
     etna::GraphicsPipeline::CreateInfo{
       .fragmentShaderOutput = {.colorAttachmentFormats = {vk::Format::eB8G8R8A8Srgb}}});
+
+  etna::create_program(
+    "proc",
+    {LOCAL_SHADERTOY2_SHADERS_ROOT "proc_texture.frag.spv",
+     LOCAL_SHADERTOY2_SHADERS_ROOT "quad.vert.spv"});
+
+  procTexPipe = pipelineManager.createGraphicsPipeline(
+    "proc",
+    etna::GraphicsPipeline::CreateInfo{
+      .fragmentShaderOutput = {.colorAttachmentFormats = {vk::Format::eB8G8R8A8Srgb}}});
+
+  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{
+    .addressMode = vk::SamplerAddressMode::eRepeat, .name = "default_sampler"});
 }
 
 App::~App()
@@ -211,7 +217,28 @@ void App::drawFrame()
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
 
     {
+      {
+
+        etna::RenderTargetState state(
+          currentCmdBuf, {{}, {256, 256}}, {{procTexBuffer.get(), procTexBuffer.getView({})}}, {});
+        currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, procTexPipe.getVkPipeline());
+
+        currentCmdBuf.pushConstants<float>(
+          procTexPipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {time});
+        currentCmdBuf.draw(3, 1, 0, 0);
+      }
       etna::flush_barriers(currentCmdBuf);
+
+      etna::set_state(
+          currentCmdBuf,
+          procTexBuffer.get(),
+          vk::PipelineStageFlagBits2::eFragmentShader,
+          {},
+          vk::ImageLayout::eShaderReadOnlyOptimal,
+          vk::ImageAspectFlagBits::eColor);
+      etna::flush_barriers(currentCmdBuf);
+
+
       {
 
         etna::RenderTargetState state(
@@ -219,28 +246,36 @@ void App::drawFrame()
 
         auto info = etna::get_shader_program("toy");
 
-
+        auto brassTextureBind =
+          brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+        auto procTextureBind =
+          procTexBuffer.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
         auto descriptorSet = etna::create_descriptor_set(
           info.getDescriptorLayoutId(0),
           currentCmdBuf,
-          {etna::Binding{
-            0,
-            brassTexture.genBinding(
-              defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}});
+          {etna::Binding{0, brassTextureBind}, etna::Binding{1, procTextureBind}});
         auto vkSet = descriptorSet.getVkSet();
 
-        currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipe.getVkPipeline());
+        currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
         currentCmdBuf.bindDescriptorSets(
-          vk::PipelineBindPoint::eGraphics, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
+          vk::PipelineBindPoint::eGraphics,
+          mainPipeline.getVkPipelineLayout(),
+          0,
+          1,
+          &vkSet,
+          0,
+          nullptr);
 
         AlignedBuffer<UniformParams> buf{};
         memcpy_aligned_std430(buf, params);
 
         currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
-          pipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
+          mainPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
 
         currentCmdBuf.draw(3, 1, 0, 0);
       }
+      etna::flush_barriers(currentCmdBuf);
+
 
       etna::set_state(
         currentCmdBuf,

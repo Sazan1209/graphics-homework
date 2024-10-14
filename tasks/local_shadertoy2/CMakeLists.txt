@@ -12,4 +12,5 @@ target_link_libraries(local_shadertoy2
 target_add_shaders(local_shadertoy2
   shaders/toy.frag
   shaders/quad.vert
+  shaders/proc_texture.frag
 )

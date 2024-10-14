@@ -34,9 +34,12 @@ private:
   glm::uvec2 resolution;
   bool useVsync;
 
+  etna::GraphicsPipeline mainPipeline;
+  etna::GraphicsPipeline procTexPipe;
+
   std::unique_ptr<etna::Window> vkWindow;
   std::unique_ptr<etna::PerFrameCmdMgr> commandManager;
-  etna::GraphicsPipeline pipe;
   etna::Sampler defaultSampler;
   etna::Image brassTexture;
+  etna::Image procTexBuffer;
 };

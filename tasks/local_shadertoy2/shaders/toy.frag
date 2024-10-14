@@ -205,6 +205,14 @@ vec4 brass_texture(in vec3 p, in vec3 n){
     return t * n;
 }
 
+layout (binding = 1) uniform sampler2D procSampler;
+
+vec4 proc_texture(in vec3 p, in vec3 n){
+    n = abs(n);
+    p /= 10.0;
+    mat3x4 t = mat3x4(texture(procSampler, p.yz), texture(procSampler, p.zx), texture(procSampler, p.xy));
+    return t * n;
+}
 
 vec4 calc_color(in vec3 p, in int mat_num, in mat4 tf){
     vec3 color = vec3(1, 1, 1);
@@ -225,7 +233,7 @@ vec4 calc_color(in vec3 p, in int mat_num, in mat4 tf){
     BEGIN_MAT(SUN)
     COLOR(100, 32, 0)
     SHINE(5)
-    //TEXTURE(1)
+    TEXTURE(proc_texture)
     END_MAT()
 
     BEGIN_MAT(PLANET1)
