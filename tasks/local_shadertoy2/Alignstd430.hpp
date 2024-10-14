@@ -185,7 +185,7 @@ size_t memcpy_std430(char* buf, size_t offset, T& val)
   typename T::row_type tmp[T::length()];
   for (size_t i = 0; i < T::length(); ++i)
   {
-      tmp[i] = val[static_cast<T::length()>((i)]; // I hate MSVC and it's damned warnings
+      tmp[i] = val[static_cast<typename T::length_type>(i)]; // I hate MSVC and it's damned warnings
   }
   return memcpy_std430(buf, offset, tmp);
 }
