@@ -5,6 +5,8 @@
 #include <etna/GlobalContext.hpp>
 #include <etna/PipelineManager.hpp>
 #include <etna/RenderTargetStates.hpp>
+#include <etna/BlockingTransferHelper.hpp>
+#include "stb_image.h"
 
 static glm::mat3 yaw(float angle)
 {
@@ -97,12 +99,34 @@ App::App()
     {LOCAL_SHADERTOY2_SHADERS_ROOT "toy.frag.spv", LOCAL_SHADERTOY2_SHADERS_ROOT "quad.vert.spv"});
 
   auto& pipelineManager = etna::get_context().getPipelineManager();
+  int x, y, n;
+  auto maybeData =
+    stbi_load(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/brass.png", &x, &y, &n, 4);
+  assert(maybeData != nullptr && "couldn't read brass texture\n");
+  auto data = reinterpret_cast<std::byte*>(maybeData);
+
+
+  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.addressMode = vk::SamplerAddressMode::eRepeat, .name = "default_sampler"});
+
+  etna::BlockingTransferHelper helper({.stagingSize = static_cast<vk::DeviceSize>(x * y * 4)});
+  brassTexture = etna::get_context().createImage(etna::Image::CreateInfo{
+    .extent = vk::Extent3D{static_cast<uint32_t>(x), static_cast<uint32_t>(y), 1},
+    .name = "brassTexture",
+    .format = vk::Format::eR8G8B8A8Unorm,
+      .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+  });
+  helper.uploadImage(
+    *etna::get_context().createOneShotCmdMgr(),
+    brassTexture,
+    0,
+    0,
+    {data, static_cast<size_t>(x * y * 4)});
+
 
   pipe = pipelineManager.createGraphicsPipeline(
     "toy",
     etna::GraphicsPipeline::CreateInfo{
       .fragmentShaderOutput = {.colorAttachmentFormats = {vk::Format::eB8G8R8A8Srgb}}});
-  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
 }
 
 App::~App()
@@ -158,7 +182,7 @@ void App::updateParams()
   glm::mat3 rotation = yaw(angle) * pitch(-pi / 6.0f);
 
   glm::mat3 mat = rotation * glm::mat3(plane_x, plane_z, start);
-  glm::vec3 pos = {15.0f * sin(angle), -15.0f * cos(angle), 7.5f};
+  glm::vec3 pos = {10.0f * sin(angle), -10.0f * cos(angle), 5.0f};
 
   mat[2] += pos;
   params.camera = mat;
@@ -193,15 +217,21 @@ void App::drawFrame()
         etna::RenderTargetState state(
           currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
 
-        // auto info = etna::get_shader_program("toy");
-        //  auto descriptorSet =
-        //    etna::create_descriptor_set(info.getDescriptorLayoutId(0), currentCmdBuf, {});
-        //  auto vkSet = descriptorSet.getVkSet();
+        auto info = etna::get_shader_program("toy");
+
+
+        auto descriptorSet = etna::create_descriptor_set(
+          info.getDescriptorLayoutId(0),
+          currentCmdBuf,
+          {etna::Binding{
+            0,
+            brassTexture.genBinding(
+              defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}});
+        auto vkSet = descriptorSet.getVkSet();
 
         currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipe.getVkPipeline());
-        // currentCmdBuf.bindDescriptorSets(
-        //   vk::PipelineBindPoint::eGraphics, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0,
-        //   nullptr);
+        currentCmdBuf.bindDescriptorSets(
+          vk::PipelineBindPoint::eGraphics, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
 
         AlignedBuffer<UniformParams> buf{};
         memcpy_aligned_std430(buf, params);
@@ -211,7 +241,6 @@ void App::drawFrame()
 
         currentCmdBuf.draw(3, 1, 0, 0);
       }
-
 
       etna::set_state(
         currentCmdBuf,

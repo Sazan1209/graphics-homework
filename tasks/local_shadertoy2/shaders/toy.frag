@@ -11,146 +11,128 @@ layout(push_constant, std430) uniform params
   UniformParams uni_params;
 };
 
-float sdE(in vec3 p, out material mat)
-{
-  float l = 10000.0;
-  mat = material(vec3(1, 1, 1), 2.0);
-  int mat_num = 0;
-  BEGIN_GROUP()
 
-  // Floor
-  BEGIN_FIG()
-  F_SHIFT(0, 0, -5)
-  END_FIG(sdCube, vec3(15, 15, 1))
+// enum materials
+#define NONE 0
+#define BRASS 1
+#define SUN 2
+#define PLANET1 3
+#define PLANET2 4
+#define PLANET3 5
+#define PLANET4 6
 
-  // Podium + main pole
-  BEGIN_FIG()
-  F_SHIFT(0, 0, -4.5)
-  END_FIG_MAT(sdCyllinder, vec2(3.5, 1), 1)
+float sdE(in vec3 p, out int mat_num, out mat4 tf){
+    float l = 10000.0;
+    mat_num = NONE;
+    BEGIN_GROUP()
 
-  BEGIN_FIG()
-  F_SHIFT(0, 0, -3.)
-  END_FIG_MAT(sdCyllinder, vec2(.5, 2), 1)
+        //Floor
+        BEGIN_FIG()
+        F_SHIFT(0, 0, -5)
+        END_FIG(sdCube, vec3(15, 15, 1))
 
-  BEGIN_FIG()
-  F_SHIFT(0, 0, -1.0)
-  END_FIG_MAT(sdSphere, 1.0, 2)
+        // Podium + main pole
 
-  END_GROUP()
+        BEGIN_FIG()
+        F_SHIFT(0, 0, -4.5)
+        END_FIG_MAT(sdCyllinder, vec2(3.5, 1), BRASS)
 
-  // Planet 1
-  BEGIN_GROUP()
-  F_YAW(uni_params.time)
-  BEGIN_FIG()
-  F_SHIFT(3.25, 0, -3.75)
-  F_ROLL(pi / 2.0)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 6), 1)
+        BEGIN_FIG()
+        F_SHIFT(0, 0, -3.)
+        END_FIG_MAT(sdCyllinder, vec2(.5, 2), BRASS)
 
-  BEGIN_FIG()
-  F_SHIFT(2.25 + 4.0, 0.0, -2.25 + 0.375 - 1.5)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+        BEGIN_FIG()
+        F_SHIFT(0, 0, -1.0)
+        END_FIG_MAT(sdSphere, 1.0, SUN)
 
-  BEGIN_FIG()
-  F_SHIFT(2.25 + 4.0, 0.0, -1.0 - 1.5)
-  END_FIG_MAT(sdSphere, .4, 6)
+    END_GROUP()
 
-  END_GROUP()
+    // Planet 1
+    BEGIN_GROUP()
+        F_YAW(uni_params.time)
+        BEGIN_FIG()
+        F_SHIFT(3.25, 0, -3.75)
+        F_ROLL(pi / 2.0)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 6), BRASS)
 
-  // Planet 2
-  BEGIN_GROUP()
-  F_YAW(-uni_params.time / 2.0)
-  BEGIN_FIG()
-  F_SHIFT(2.75 - .3333 / 2.0, 0, -3.25)
-  F_ROLL(pi / 2.0)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 4.6666), 1)
+        BEGIN_FIG()
+        F_SHIFT(2.25 + 4.0, 0.0, -2.25 + 0.375 - 1.5)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), BRASS)
 
-  BEGIN_FIG()
-  F_SHIFT(2.25 + 2.6666, 0.0, -2.25 + 0.375 - 1.0)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+        BEGIN_FIG()
+        F_SHIFT(2.25 + 4.0, 0.0, -1.0 - 1.5)
+        END_FIG_MAT(sdSphere, .4, PLANET1)
 
-  BEGIN_FIG()
-  F_SHIFT(2.25 + 2.6666, 0.0, -1.0 - 1.0)
-  END_FIG_MAT(sdSphere, .7, 5)
-  END_GROUP()
+    END_GROUP()
 
-  // Planet 3
-  BEGIN_GROUP()
+    // Planet 2
+    BEGIN_GROUP()
+        F_YAW(-uni_params.time / 2.0)
+        BEGIN_FIG()
+        F_SHIFT(2.75 - .3333 / 2.0, 0, -3.25)
+        F_ROLL(pi / 2.0)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 4.6666), BRASS)
 
-  F_YAW(-uni_params.time)
-  BEGIN_FIG()
-  F_SHIFT(2.25 - .33333, 0, -2.75)
-  F_ROLL(pi / 2.0)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 3.3333), 1)
+        BEGIN_FIG()
+        F_SHIFT(2.25 + 2.6666, 0.0, -2.25 + 0.375 - 1.0)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), BRASS)
 
-  BEGIN_FIG()
-  F_SHIFT(2.25 + 1.3333, 0.0, -2.25 + 0.375 - .5)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+        BEGIN_FIG()
+        F_SHIFT(2.25 + 2.6666, 0.0, -1.0 - 1.0)
+        END_FIG_MAT(sdSphere, .7, PLANET2)
+    END_GROUP()
 
-  BEGIN_FIG()
-  F_SHIFT(2.25 + 1.3333, 0.0, -1.0 - .5)
-  END_FIG_MAT(sdSphere, .5, 4)
+    // Planet 3
+    BEGIN_GROUP()
 
-  END_GROUP()
+        F_YAW(-uni_params.time)
+        BEGIN_FIG()
+        F_SHIFT(2.25 - .33333, 0, -2.75)
+        F_ROLL(pi / 2.0)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 3.3333), 1)
 
-  // Planet 4
-  BEGIN_GROUP()
+        BEGIN_FIG()
+        F_SHIFT(2.25 + 1.3333, 0.0, -2.25 + 0.375 - .5)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
 
-  F_YAW(uni_params.time * 1.5)
-  BEGIN_FIG()
-  F_SHIFT(1.25, 0, -2.25)
-  F_ROLL(pi / 2.0)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 2), 1)
+        BEGIN_FIG()
+        F_SHIFT(2.25 + 1.3333, 0.0, -1.0 - .5)
+        END_FIG_MAT(sdSphere, .5, PLANET3)
 
-  BEGIN_FIG()
-  F_SHIFT(2.25, 0.0, -2.25 + 0.375)
-  END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
+    END_GROUP()
 
-  BEGIN_FIG()
-  F_SHIFT(2.25, 0.0, -1.0)
-  END_FIG_MAT(sdSphere, .5, 3)
-  END_GROUP()
 
-  BEGIN_MAT(1)
-  COLOR(80, 50, 20)
-  END_MAT()
+    // Planet 4
+    BEGIN_GROUP()
 
-  BEGIN_MAT(2)
-  COLOR(100, 92, 0)
-  ROUGH(50)
-  END_MAT()
+        F_YAW(uni_params.time*1.5)
+        BEGIN_FIG()
+        F_SHIFT(1.25, 0, -2.25)
+        F_ROLL(pi / 2.0)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 2), 1)
 
-  BEGIN_MAT(3)
-  COLOR(0, 8, 100)
-  ROUGH(50)
-  END_MAT()
+        BEGIN_FIG()
+        F_SHIFT(2.25, 0.0, -2.25 + 0.375)
+        END_FIG_MAT(sdCyllinder, vec2(.25, 0.75), 1)
 
-  BEGIN_MAT(4)
-  COLOR(100, 0, 8)
-  ROUGH(50)
-  END_MAT()
+        BEGIN_FIG()
+        F_SHIFT(2.25, 0.0, -1.0)
+        END_FIG_MAT(sdSphere, .5, PLANET4)
+    END_GROUP()
 
-  BEGIN_MAT(5)
-  COLOR(0, 100, 92)
-  ROUGH(50)
-  END_MAT()
-
-  BEGIN_MAT(6)
-  COLOR(8, 100, 0)
-  ROUGH(50)
-  END_MAT()
-
-  return l;
+    return l;
 }
 
 float sdE(vec3 p)
 {
-  material mat;
-  return sdE(p, mat);
+  int mat;
+  mat4 tf;
+  return sdE(p, mat, tf);
 }
 
 #define MAX_ITERS 90
 #define MAX_DIST 100.0
-vec3 trace(vec3 from, vec3 dir, out bool hit, out material mat)
+vec3 trace(vec3 from, vec3 dir, out bool hit, out int mat_num, out mat4 tf)
 {
   vec3 p = from;
   float totalDist = 0.0;
@@ -159,7 +141,7 @@ vec3 trace(vec3 from, vec3 dir, out bool hit, out material mat)
 
   for (int steps = 0; steps < MAX_ITERS; steps++)
   {
-    float dist = sdE(p, mat);
+    float dist = sdE(p, mat_num, tf);
 
     if (dist < 0.01)
     {
@@ -178,6 +160,12 @@ vec3 trace(vec3 from, vec3 dir, out bool hit, out material mat)
   return p;
 }
 
+vec3 trace(vec3 from, vec3 dir, out bool hit){
+    int mat_num;
+    mat4 tf;
+    return trace(from, dir, hit, mat_num, tf);
+}
+
 vec3 generateNormal(vec3 z, float d)
 {
   float e = max(d * 0.5, 0.0001);
@@ -191,23 +179,78 @@ vec3 generateNormal(vec3 z, float d)
   return normalize(vec3(dx1 - dx2, dy1 - dy2, dz1 - dz2));
 }
 
-float calculate_light(in vec3 p, float shine)
+float calculate_light(in vec3 p, in float shine, in vec3 normal)
 {
   vec3 light_v = normalize(uni_params.lightPos - p);
   bool hit;
-  material mat;
   float ambient = 0.2;
-  trace(p + light_v * 0.1, light_v, hit, mat);
+  trace(p + normal * 0.1, light_v, hit);
   if (hit)
   {
     return ambient;
   }
-  vec3 normal = generateNormal(p, 0.001);
   vec3 eye_v = normalize(uni_params.cam_pos - p);
   float diffuse = max(0.0, dot(normal, light_v));
   vec3 refract_v = normalize(eye_v + light_v);
   float highlight = max(0.0, dot(refract_v, normal));
   return diffuse + pow(highlight, shine) + ambient;
+}
+
+layout (binding = 0) uniform sampler2D brassSampler;
+
+vec4 brass_texture(in vec3 p, in vec3 n){
+    n = abs(n);
+    p /= 20.0;
+    mat3x4 t = mat3x4(texture(brassSampler, p.yz), texture(brassSampler, p.zx), texture(brassSampler, p.xy));
+    return t * n;
+}
+
+
+vec4 calc_color(in vec3 p, in int mat_num, in mat4 tf){
+    vec3 color = vec3(1, 1, 1);
+    vec3 normal = generateNormal(p, 0.001);
+    vec3 normal_rel = mat3(tf) * normal;
+    vec3 p_rel = vec3(tf * vec4(p, 1));
+    float shine = 5;
+
+    BEGIN_MAT(NONE)
+    END_MAT()
+
+    BEGIN_MAT(BRASS)
+    COLOR(81, 64, 26)
+    TEXTURE(brass_texture)
+    SHINE(50)
+    END_MAT()
+
+    BEGIN_MAT(SUN)
+    COLOR(100, 32, 0)
+    SHINE(5)
+    //TEXTURE(1)
+    END_MAT()
+
+    BEGIN_MAT(PLANET1)
+    COLOR(0, 8, 100)
+    //TEXTURE(0)
+    SHINE(5)
+    END_MAT()
+
+    BEGIN_MAT(PLANET2)
+    COLOR(100, 0, 0)
+    TEXTURE(brass_texture)
+    SHINE(5)
+    END_MAT()
+
+    BEGIN_MAT(PLANET3)
+    COLOR(0, 100, 92)
+    SHINE(5)
+    //TEXTURE(0)
+    END_MAT()
+
+    BEGIN_MAT(PLANET4)
+    COLOR(8, 100, 0)
+    //TEXTURE(0)
+    SHINE(5)
+    END_MAT()
 }
 
 vec3 screen_to_world(in vec2 sc)
@@ -218,14 +261,14 @@ vec3 screen_to_world(in vec2 sc)
 void mainImage(out vec4 fragColor, in vec2 fragCoord)
 {
   vec3 p = screen_to_world(fragCoord);
-
+  mat4 tf;
+  int mat_num;
   bool hit;
-  material mat;
-  p = trace(p, normalize(p - uni_params.cam_pos), hit, mat);
+
+  p = trace(p, normalize(p - uni_params.cam_pos), hit, mat_num, tf);
   if (hit)
   {
-    float l = calculate_light(p, mat.roughness);
-    fragColor = vec4(mat.color * l, 1.0);
+    fragColor = calc_color(p, mat_num, tf);
   }
   else
   {

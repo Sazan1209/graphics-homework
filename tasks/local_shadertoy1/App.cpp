@@ -90,7 +90,7 @@ App::App()
   commandManager = etna::get_context().createPerFrameCmdMgr();
   // Alloc resources
 
-  etna::create_program("comp", {LOCAL_SHADERTOY_SHADERS_ROOT "toy.comp.spv"});
+  etna::create_program("comp", {LOCAL_SHADERTOY1_SHADERS_ROOT "toy.comp.spv"});
 
   auto& pipelineManager = etna::get_context().getPipelineManager();
 

@@ -38,4 +38,5 @@ private:
   std::unique_ptr<etna::PerFrameCmdMgr> commandManager;
   etna::GraphicsPipeline pipe;
   etna::Sampler defaultSampler;
+  etna::Image brassTexture;
 };
