@@ -183,9 +183,9 @@ template <glsl_mat T>
 size_t memcpy_std430(char* buf, size_t offset, T& val)
 {
   typename T::row_type tmp[T::length()];
-  for (size_t i = 0; i < static_cast<size_t>(T::length()); ++i)
+  for (size_t i = 0; i < T::length(); ++i)
   {
-    tmp[i] = val[i];
+      tmp[i] = val[static_cast<T::length()>((i)]; // I hate MSVC and it's damned warnings
   }
   return memcpy_std430(buf, offset, tmp);
 }
