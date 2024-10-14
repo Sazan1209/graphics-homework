@@ -56,10 +56,10 @@ using shader_bool = glm::uint;
 
 struct UniformParams
 {
-  shader_float time;
   shader_mat3 camera;
   shader_vec3 cam_pos;
   shader_vec3 lightPos;
+  shader_float time;
 };
 
 #endif // UNIFORM_PARAMS_H_INCLUDED

@@ -162,7 +162,7 @@ size_t memcpy_std430(char* buf, size_t offset, T& val)
 {
   offset = round_up_to(offset, baseAlign<T>);
   memcpy(buf + offset, &val, sizeof(val)); // Probably illegal
-  return offset + baseAlign<T>;
+  return offset + sizeof(val);             // No padding at the end
 }
 
 template <typename T, size_t N>
@@ -174,8 +174,9 @@ size_t memcpy_std430(char* buf, size_t offset, Arr<T, N>& arr)
   for (size_t i = 0; i < N; ++i)
   {
     offset = memcpy_std430(buf, offset, arr[i]);
+    offset = round_up_to(offset, baseAlign<T[N]>); // Includes padding
   }
-  return round_up_to(offset, baseAlign<T[N]>);
+  return offset;
 }
 
 template <glsl_mat T>
@@ -200,7 +201,7 @@ size_t memcpy_std430(char* buf, size_t offset, T& val)
   auto tup = to_tuple(val);
   offset = memcpy_std430_tup(
     buf, offset, tup, std::make_integer_sequence<size_t, std::tuple_size_v<decltype(tup)>>());
-  return round_up_to(offset, baseAlign<T>);
+  return round_up_to(offset, baseAlign<T>); // includes padding
 }
 
 template <typename T, typename... Ts>
@@ -222,24 +223,14 @@ size_t memcpy_std430_tup(
 template <typename T>
 constexpr size_t alignedSize = 0;
 
-template <glsl_scalar T>
+template <glsl_vec_or_scal T>
 constexpr size_t alignedSize<T> = sizeof(T);
 
-template <glsl_vec2 T>
-constexpr size_t alignedSize<T> = alignedSize<typename T::value_type> * 2;
-
-template <glsl_vec4 T>
-constexpr size_t alignedSize<T> = alignedSize<typename T::value_type> * 4;
-
-template <glsl_vec3 T>
-constexpr size_t alignedSize<T> = alignedSize<typename T::value_type> * 4;
-
 template <typename T, size_t N>
-constexpr size_t alignedSize<T[N]> = alignedSize<T>() * N;
+constexpr size_t alignedSize<T[N]> = round_up_to(alignedSize<T>, baseAlign<T>) * N;
 
 template <glsl_mat T>
-constexpr size_t alignedSize<T> = alignedSize<typename T::row_type> * T::length();
-
+constexpr size_t alignedSize<T> = alignedSize<typename T::row_type[T::length()]>;
 
 template <typename T>
 constexpr size_t aligned_size_tup(size_t offset)
@@ -247,7 +238,6 @@ constexpr size_t aligned_size_tup(size_t offset)
   offset = round_up_to(offset, baseAlign<T>);
   return alignedSize<T> + offset;
 }
-
 
 // T1 is necessary, because otherwise the call is ambiguous. Which is stupid
 template <typename T, typename T1, typename... Ts>
