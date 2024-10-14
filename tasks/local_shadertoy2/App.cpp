@@ -230,12 +230,12 @@ void App::drawFrame()
       etna::flush_barriers(currentCmdBuf);
 
       etna::set_state(
-          currentCmdBuf,
-          procTexBuffer.get(),
-          vk::PipelineStageFlagBits2::eFragmentShader,
-          {},
-          vk::ImageLayout::eShaderReadOnlyOptimal,
-          vk::ImageAspectFlagBits::eColor);
+        currentCmdBuf,
+        procTexBuffer.get(),
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        {},
+        vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageAspectFlagBits::eColor);
       etna::flush_barriers(currentCmdBuf);
 
 
