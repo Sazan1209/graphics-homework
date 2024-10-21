@@ -89,8 +89,7 @@ App::App()
       .extent = vk::Extent3D{static_cast<uint32_t>(x), static_cast<uint32_t>(y), 1},
       .name = "brassTexture",
       .format = vk::Format::eR8G8B8A8Unorm,
-      .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
-        vk::ImageUsageFlagBits::eTransferDst,
+      .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
     });
     helper.uploadImage(
       *etna::get_context().createOneShotCmdMgr(),
@@ -103,9 +102,9 @@ App::App()
 
   // Alloc buffer for proc texture
 
-  procTexBuffer = etna::get_context().createImage(etna::Image::CreateInfo{
+  procTexImage = etna::get_context().createImage(etna::Image::CreateInfo{
     .extent = vk::Extent3D{256, 256, 1},
-    .name = "procTexBuffer",
+    .name = "procTexImage",
     .format = vk::Format::eB8G8R8A8Srgb,
     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eColorAttachment,
   });
@@ -218,9 +217,8 @@ void App::drawFrame()
 
     {
       {
-
         etna::RenderTargetState state(
-          currentCmdBuf, {{}, {256, 256}}, {{procTexBuffer.get(), procTexBuffer.getView({})}}, {});
+          currentCmdBuf, {{}, {256, 256}}, {{procTexImage.get(), procTexImage.getView({})}}, {});
         currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, procTexPipe.getVkPipeline());
 
         currentCmdBuf.pushConstants<float>(
@@ -231,9 +229,9 @@ void App::drawFrame()
 
       etna::set_state(
         currentCmdBuf,
-        procTexBuffer.get(),
+        procTexImage.get(),
         vk::PipelineStageFlagBits2::eFragmentShader,
-        {},
+        {vk::AccessFlagBits2::eShaderRead},
         vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageAspectFlagBits::eColor);
       etna::flush_barriers(currentCmdBuf);
@@ -249,7 +247,7 @@ void App::drawFrame()
         auto brassTextureBind =
           brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
         auto procTextureBind =
-          procTexBuffer.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+          procTexImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
         auto descriptorSet = etna::create_descriptor_set(
           info.getDescriptorLayoutId(0),
           currentCmdBuf,

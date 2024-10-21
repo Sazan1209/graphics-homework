@@ -41,5 +41,5 @@ private:
   std::unique_ptr<etna::PerFrameCmdMgr> commandManager;
   etna::Sampler defaultSampler;
   etna::Image brassTexture;
-  etna::Image procTexBuffer;
+  etna::Image procTexImage;
 };

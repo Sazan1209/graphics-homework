@@ -124,15 +124,16 @@ constexpr size_t baseAlign<T[N]> = baseAlign<T>;
 template <glsl_mat T>
 constexpr size_t baseAlign<T> = baseAlign<typename T::row_type>;
 
-constexpr size_t max_size()
-{
-  return 0;
-}
-
 template <typename... Ts>
-constexpr size_t max_size(size_t s1, Ts... ts)
+constexpr size_t max_size(Ts... ts)
 {
-  return std::max(s1, max_size(ts...));
+  size_t res = 0;
+  size_t vals[] = {ts...};
+  for (size_t i = 0; i < sizeof...(Ts); ++i)
+  {
+    res = std::max(res, vals[i]);
+  }
+  return res;
 }
 
 template <typename Tup, size_t... indices>
@@ -154,11 +155,10 @@ template <typename T>
   requires(!glsl_mat<T> && !glsl_scalar<T> && !glsl_vec<T>)
 constexpr size_t baseAlign<T> = BaseAlign_struct_helper<T>::val;
 
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <glsl_vec_or_scal T>
-size_t memcpy_std430(char* buf, size_t offset, T& val)
+size_t memcpy_std430(std::byte* buf, size_t offset, T& val)
 {
   offset = round_up_to(offset, baseAlign<T>);
   memcpy(buf + offset, &val, sizeof(val)); // Probably illegal
@@ -169,7 +169,7 @@ template <typename T, size_t N>
 using Arr = T[N];
 
 template <typename T, size_t N>
-size_t memcpy_std430(char* buf, size_t offset, Arr<T, N>& arr)
+size_t memcpy_std430(std::byte* buf, size_t offset, Arr<T, N>& arr)
 {
   for (size_t i = 0; i < N; ++i)
   {
@@ -180,7 +180,7 @@ size_t memcpy_std430(char* buf, size_t offset, Arr<T, N>& arr)
 }
 
 template <glsl_mat T>
-size_t memcpy_std430(char* buf, size_t offset, T& val)
+size_t memcpy_std430(std::byte* buf, size_t offset, T& val)
 {
   typename T::row_type tmp[T::length()];
   for (size_t i = 0; i < T::length(); ++i)
@@ -192,10 +192,10 @@ size_t memcpy_std430(char* buf, size_t offset, T& val)
 
 template <typename... Ts, size_t... indices>
 size_t memcpy_std430_tup(
-  char* buf, size_t offset, std::tuple<Ts...>& val, std::integer_sequence<size_t, indices...>);
+  std::byte* buf, size_t offset, std::tuple<Ts...>& val, std::integer_sequence<size_t, indices...>);
 
 template <typename T>
-size_t memcpy_std430(char* buf, size_t offset, T& val)
+size_t memcpy_std430(std::byte* buf, size_t offset, T& val)
 {
   offset = round_up_to(offset, baseAlign<T>);
   auto tup = to_tuple(val);
@@ -205,7 +205,7 @@ size_t memcpy_std430(char* buf, size_t offset, T& val)
 }
 
 template <typename T, typename... Ts>
-size_t memcpy_std430(char* buf, size_t offset, T& val, Ts&... ts)
+size_t memcpy_std430(std::byte* buf, size_t offset, T& val, Ts&... ts)
 {
   offset = memcpy_std430(buf, offset, val);
   return memcpy_std430(buf, offset, ts...);
@@ -213,7 +213,7 @@ size_t memcpy_std430(char* buf, size_t offset, T& val, Ts&... ts)
 
 template <typename... Ts, size_t... indices>
 size_t memcpy_std430_tup(
-  char* buf, size_t offset, std::tuple<Ts...>& val, std::integer_sequence<size_t, indices...>)
+  std::byte* buf, size_t offset, std::tuple<Ts...>& val, std::integer_sequence<size_t, indices...>)
 {
   return memcpy_std430(buf, offset, std::get<indices>(val)...);
 }
@@ -263,12 +263,12 @@ template <typename T>
 constexpr size_t alignedSize = detail::alignedSize<T>;
 
 template <typename T>
-using AlignedBuffer = char[alignedSize<T>];
+using AlignedBuffer = std::byte[alignedSize<T>];
 
 template <typename T>
 size_t memcpy_aligned_std430(AlignedBuffer<T>& buf, T& val)
 {
-  return detail::memcpy_std430(static_cast<char*>(buf), 0, val);
+  return detail::memcpy_std430(static_cast<std::byte*>(buf), 0, val);
 }
 
 #endif // ALIGNSTD430_HPP
