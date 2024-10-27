@@ -6,6 +6,7 @@
 #include <etna/PipelineManager.hpp>
 #include <etna/RenderTargetStates.hpp>
 #include <etna/BlockingTransferHelper.hpp>
+#include <etna/Profiling.hpp>
 #include "stb_image.h"
 
 static glm::mat3 yaw(float angle)
@@ -130,6 +131,7 @@ void App::run()
     getInput();
     updateParams();
     drawFrame();
+    FrameMark;
   }
 
   ETNA_CHECK_VK_RESULT(etna::get_context().getDevice().waitIdle());
@@ -137,6 +139,7 @@ void App::run()
 
 void App::getInput()
 {
+  ZoneScoped;
   time = static_cast<float>(windowing.getTime());
   if (osWindow->mouse[MouseButton::mbRight] == ButtonState::Rising)
   {
@@ -152,6 +155,7 @@ void App::getInput()
 
 void App::updateParams()
 {
+  ZoneScoped;
   constexpr float pi = 3.1415926535897932384626433f;
   constexpr float fov = pi * 4.0f / 12.0f; // 75 degrees
   constexpr float dist = 0.8f;
@@ -178,57 +182,73 @@ void App::updateParams()
 
 void App::drawProcTexture(vk::CommandBuffer& currentCmdBuf)
 {
-  etna::RenderTargetState state(
-    currentCmdBuf, {{}, {256, 256}}, {{procTexImage.get(), procTexImage.getView({})}}, {});
-  currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, procTexPipe.getVkPipeline());
+  ZoneScoped;
+  {
+    ETNA_PROFILE_GPU(currentCmdBuf, procImage);
+    etna::RenderTargetState state(
+      currentCmdBuf, {{}, {256, 256}}, {{procTexImage.get(), procTexImage.getView({})}}, {});
+    currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, procTexPipe.getVkPipeline());
 
-  currentCmdBuf.pushConstants<float>(
-    procTexPipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {time});
-  currentCmdBuf.draw(3, 1, 0, 0);
+    currentCmdBuf.pushConstants<float>(
+      procTexPipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {time});
+    currentCmdBuf.draw(3, 1, 0, 0);
 
-  etna::set_state(
-    currentCmdBuf,
-    procTexImage.get(),
-    vk::PipelineStageFlagBits2::eFragmentShader,
-    {vk::AccessFlagBits2::eShaderRead},
-    vk::ImageLayout::eShaderReadOnlyOptimal,
-    vk::ImageAspectFlagBits::eColor);
-  etna::flush_barriers(currentCmdBuf);
+    etna::set_state(
+      currentCmdBuf,
+      procTexImage.get(),
+      vk::PipelineStageFlagBits2::eFragmentShader,
+      {vk::AccessFlagBits2::eShaderRead},
+      vk::ImageLayout::eShaderReadOnlyOptimal,
+      vk::ImageAspectFlagBits::eColor);
+    etna::flush_barriers(currentCmdBuf);
+  }
 }
 
-void App::drawMainImage(vk::CommandBuffer& currentCmdBuf, vk::Image& backbuffer, vk::ImageView& backbufferView)
+void App::drawMainImage(
+  vk::CommandBuffer& currentCmdBuf, vk::Image& backbuffer, vk::ImageView& backbufferView)
 {
-  etna::RenderTargetState state(
-    currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
+  ZoneScoped;
+  {
+    ETNA_PROFILE_GPU(currentCmdBuf, mainImage);
+    etna::RenderTargetState state(
+      currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
 
-  auto info = etna::get_shader_program("toy");
+    auto info = etna::get_shader_program("toy");
 
-  auto brassTextureBind =
-    brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  auto procTextureBind =
-    procTexImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  auto descriptorSet = etna::create_descriptor_set(
-    info.getDescriptorLayoutId(0),
-    currentCmdBuf,
-    {etna::Binding{0, brassTextureBind}, etna::Binding{1, procTextureBind}});
-  auto vkSet = descriptorSet.getVkSet();
+    auto brassTextureBind =
+      brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto procTextureBind =
+      procTexImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto descriptorSet = etna::create_descriptor_set(
+      info.getDescriptorLayoutId(0),
+      currentCmdBuf,
+      {etna::Binding{0, brassTextureBind}, etna::Binding{1, procTextureBind}});
+    auto vkSet = descriptorSet.getVkSet();
 
-  currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
-  currentCmdBuf.bindDescriptorSets(
-    vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
+    currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
+    currentCmdBuf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics,
+      mainPipeline.getVkPipelineLayout(),
+      0,
+      1,
+      &vkSet,
+      0,
+      nullptr);
 
-  AlignedBuffer<UniformParams> buf{};
-  memcpy_aligned_std430(buf, params);
+    AlignedBuffer<UniformParams> buf{};
+    memcpy_aligned_std430(buf, params);
 
-  currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
-    mainPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
+    currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
+      mainPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
 
-  currentCmdBuf.draw(3, 1, 0, 0);
-  etna::flush_barriers(currentCmdBuf);
+    currentCmdBuf.draw(3, 1, 0, 0);
+    etna::flush_barriers(currentCmdBuf);
+  }
 }
 
 void App::drawFrame()
 {
+  ZoneScoped;
   auto currentCmdBuf = commandManager->acquireNext();
 
   etna::begin_frame();
@@ -240,7 +260,7 @@ void App::drawFrame()
 
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
-
+      ETNA_PROFILE_GPU(currentCmdBuf, rendering);
       drawProcTexture(currentCmdBuf);
       drawMainImage(currentCmdBuf, backbuffer, backbufferView);
 
@@ -261,6 +281,7 @@ void App::drawFrame()
 
     if (!presented)
       nextSwapchainImage = std::nullopt;
+    ETNA_READ_BACK_GPU_PROFILING(currentCmdBuf);
   }
 
   etna::end_frame();
