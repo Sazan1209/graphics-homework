@@ -6,6 +6,7 @@
 #include <etna/Sampler.hpp>
 #include <etna/Window.hpp>
 #include <etna/Buffer.hpp>
+#include <etna/GpuSharedResource.hpp>
 
 #include "shaders/UniformParams.h"
 #include "wsi/OsWindowingManager.hpp"
@@ -46,5 +47,6 @@ private:
   etna::Sampler defaultSampler;
   etna::Image brassTexture;
   etna::Image procTexImage;
-  etna::Buffer constants;
+  etna::GpuWorkCount workCount;
+  etna::GpuSharedResource<etna::Buffer> constants;
 };

@@ -71,6 +71,8 @@ void App::compileShaders()
 App::App()
   : resolution{1280, 720}
   , useVsync{true}
+  , workCount(2)
+  , constants(workCount, std::in_place_t())
 {
   {
     auto glfwInstExts = windowing.getRequiredVulkanInstanceExtensions();
@@ -84,7 +86,7 @@ App::App()
       .deviceExtensions = deviceExtensions,
       // Replace with an index if etna detects your preferred GPU incorrectly
       .physicalDeviceIndexOverride = {},
-      .numFramesInFlight = 1,
+      .numFramesInFlight = static_cast<uint32_t>(workCount.multiBufferingCount()),
     });
   }
   osWindow = windowing.createWindow(OsWindow::CreateInfo{
@@ -109,14 +111,15 @@ App::App()
   uploadTexture();
   compileShaders();
 
-  constants = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
-    .size = sizeof(UniformParams),
-    .bufferUsage = vk::BufferUsageFlagBits::eUniformBuffer,
-    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
-    .name = "constants",
+  constants.iterate([&](auto& curr) {
+    curr = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
+      .size = alignedSize<UniformParams>,
+      .bufferUsage = vk::BufferUsageFlagBits::eUniformBuffer,
+      .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+      .name = "constants",
+    });
+    curr.map();
   });
-
-  constants.map();
 
   procTexImage = etna::get_context().createImage(etna::Image::CreateInfo{
     .extent = vk::Extent3D{256, 256, 1},
@@ -140,6 +143,7 @@ void App::run()
     getInput();
     updateParams();
     drawFrame();
+    workCount.submit();
     FrameMark;
   }
 
@@ -233,7 +237,7 @@ void App::drawMainImage(
       currentCmdBuf,
       {etna::Binding{0, brassTextureBind},
        etna::Binding{1, procTextureBind},
-       etna::Binding{2, constants.genBinding()}});
+       etna::Binding{2, constants.get().genBinding()}});
     auto vkSet = descriptorSet.getVkSet();
 
     currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
@@ -249,7 +253,7 @@ void App::drawMainImage(
     AlignedBuffer<UniformParams> buf{};
     memcpy_aligned_std430(buf, params);
 
-    std::memcpy(constants.data(), buf, sizeof(buf));
+    std::memcpy(constants.get().data(), buf, sizeof(buf));
 
     currentCmdBuf.draw(3, 1, 0, 0);
     etna::flush_barriers(currentCmdBuf);
