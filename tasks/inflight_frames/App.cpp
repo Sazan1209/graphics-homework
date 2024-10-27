@@ -109,6 +109,15 @@ App::App()
   uploadTexture();
   compileShaders();
 
+  constants = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
+    .size = sizeof(UniformParams),
+    .bufferUsage = vk::BufferUsageFlagBits::eUniformBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+    .name = "constants",
+  });
+
+  constants.map();
+
   procTexImage = etna::get_context().createImage(etna::Image::CreateInfo{
     .extent = vk::Extent3D{256, 256, 1},
     .name = "procTexImage",
@@ -222,7 +231,9 @@ void App::drawMainImage(
     auto descriptorSet = etna::create_descriptor_set(
       info.getDescriptorLayoutId(0),
       currentCmdBuf,
-      {etna::Binding{0, brassTextureBind}, etna::Binding{1, procTextureBind}});
+      {etna::Binding{0, brassTextureBind},
+       etna::Binding{1, procTextureBind},
+       etna::Binding{2, constants.genBinding()}});
     auto vkSet = descriptorSet.getVkSet();
 
     currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
@@ -238,8 +249,7 @@ void App::drawMainImage(
     AlignedBuffer<UniformParams> buf{};
     memcpy_aligned_std430(buf, params);
 
-    currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
-      mainPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
+    std::memcpy(constants.data(), buf, sizeof(buf));
 
     currentCmdBuf.draw(3, 1, 0, 0);
     etna::flush_barriers(currentCmdBuf);

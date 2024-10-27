@@ -46,4 +46,5 @@ private:
   etna::Sampler defaultSampler;
   etna::Image brassTexture;
   etna::Image procTexImage;
+  etna::Buffer constants;
 };
