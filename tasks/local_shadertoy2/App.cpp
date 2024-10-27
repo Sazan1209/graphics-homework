@@ -1,8 +1,12 @@
 #include "App.hpp"
+#include "Alignstd430.hpp"
 
 #include <etna/Etna.hpp>
 #include <etna/GlobalContext.hpp>
 #include <etna/PipelineManager.hpp>
+#include <etna/RenderTargetStates.hpp>
+#include <etna/BlockingTransferHelper.hpp>
+#include "stb_image.h"
 
 static glm::mat3 yaw(float angle)
 {
@@ -58,50 +62,76 @@ App::App()
     .resolution = resolution,
   });
 
-  // But we also need to hook the OS window up to Vulkan manually!
+  //
   {
-    // First, we ask GLFW to provide a "surface" for the window,
-    // which is an opaque description of the area where we can actually render.
     auto surface = osWindow->createVkSurface(etna::get_context().getInstance());
-
-    // Then we pass it to Etna to do the complicated work for us
     vkWindow = etna::get_context().createWindow(etna::Window::CreateInfo{
       .surface = std::move(surface),
     });
-
-    // And finally ask Etna to create the actual swapchain so that we can
-    // get (different) images each frame to render stuff into.
-    // Here, we do not support window resizing, so we only need to call this
-    // once.
     auto [w, h] = vkWindow->recreateSwapchain(etna::Window::DesiredProperties{
       .resolution = {resolution.x, resolution.y},
       .vsync = useVsync,
     });
-
-    // Technically, Vulkan might fail to initialize a swapchain with the
-    // requested resolution and pick a different one. This, however, does not
-    // occur on platforms we support. Still, it's better to follow the
-    // "intended" path.
     resolution = {w, h};
   }
 
-  // Next, we need a magical Etna helper to send commands to the GPU.
-  // How it is actually performed is not trivial, but we can skip this for now.
   commandManager = etna::get_context().createPerFrameCmdMgr();
-  // Alloc resources
 
-  etna::create_program("comp", {LOCAL_SHADERTOY1_SHADERS_ROOT "toy.comp.spv"});
+  // Upload texture
+  {
+    int x, y, n;
+    auto maybeData = stbi_load(GRAPHICS_COURSE_RESOURCES_ROOT "/textures/brass.png", &x, &y, &n, 4);
+    assert(maybeData != nullptr && "couldn't read brass texture\n");
+    auto data = reinterpret_cast<std::byte*>(maybeData);
+
+    etna::BlockingTransferHelper helper({.stagingSize = static_cast<vk::DeviceSize>(x * y * 4)});
+    brassTexture = etna::get_context().createImage(etna::Image::CreateInfo{
+      .extent = vk::Extent3D{static_cast<uint32_t>(x), static_cast<uint32_t>(y), 1},
+      .name = "brassTexture",
+      .format = vk::Format::eR8G8B8A8Unorm,
+      .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+    });
+    helper.uploadImage(
+      *etna::get_context().createOneShotCmdMgr(),
+      brassTexture,
+      0,
+      0,
+      {data, static_cast<size_t>(x * y * 4)});
+    stbi_image_free(data);
+  }
+
+  // Alloc buffer for proc texture
+
+  procTexImage = etna::get_context().createImage(etna::Image::CreateInfo{
+    .extent = vk::Extent3D{256, 256, 1},
+    .name = "procTexImage",
+    .format = vk::Format::eB8G8R8A8Srgb,
+    .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eColorAttachment,
+  });
+
+  // Compile pipelines
+  etna::create_program(
+    "toy",
+    {LOCAL_SHADERTOY2_SHADERS_ROOT "toy.frag.spv", LOCAL_SHADERTOY2_SHADERS_ROOT "quad.vert.spv"});
 
   auto& pipelineManager = etna::get_context().getPipelineManager();
+  mainPipeline = pipelineManager.createGraphicsPipeline(
+    "toy",
+    etna::GraphicsPipeline::CreateInfo{
+      .fragmentShaderOutput = {.colorAttachmentFormats = {vk::Format::eB8G8R8A8Srgb}}});
 
-  pipe = pipelineManager.createComputePipeline("comp", {});
-  storage = etna::get_context().createImage(etna::Image::CreateInfo{
-    .extent = vk::Extent3D{resolution.x, resolution.y, 1},
-    .name = "storage",
-    .format = vk::Format::eR8G8B8A8Unorm,
-    .imageUsage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc});
+  etna::create_program(
+    "proc",
+    {LOCAL_SHADERTOY2_SHADERS_ROOT "proc_texture.frag.spv",
+     LOCAL_SHADERTOY2_SHADERS_ROOT "quad.vert.spv"});
 
-  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
+  procTexPipe = pipelineManager.createGraphicsPipeline(
+    "proc",
+    etna::GraphicsPipeline::CreateInfo{
+      .fragmentShaderOutput = {.colorAttachmentFormats = {vk::Format::eB8G8R8A8Srgb}}});
+
+  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{
+    .addressMode = vk::SamplerAddressMode::eRepeat, .name = "default_sampler"});
 }
 
 App::~App()
@@ -142,23 +172,28 @@ void App::getInput()
 
 void App::updateParams()
 {
-  float pi2 = 3.1415926535897932384626433f * 2.0f;
+  constexpr float pi = 3.1415926535897932384626433f;
+  constexpr float fov = pi * 4.0f / 12.0f; // 75 degrees
+  constexpr float dist = 0.8f;
+
+  glm::vec3 depth = glm::vec3{0, 1, 0} * dist;
+  float ratio = static_cast<float>(resolution.y) / static_cast<float>(resolution.x);
+  glm::vec3 plane_x = glm::vec3{1, 0, 0} * std::tan(fov / 2.0f) * 2.0f;
+  glm::vec3 plane_z = glm::vec3{0, 0, -1} * std::tan(fov / 2.0f) * ratio * 2.0f;
+  glm::vec3 start = depth - 0.5f * (plane_x + plane_z);
+
   auto coef = mouse / glm::vec2(resolution);
-  glm::mat3 rotation = yaw(coef.x * pi2) * pitch(-pi2 / 12.0f);
-  glm::vec3 start = {0, 0.8, 0};
-  float area = glm::sqrt(static_cast<float>(resolution.x * resolution.y));
-  glm::vec3 plane_x = {0.5 / area, 0, 0};
-  glm::vec3 plane_z = {0, 0, -0.5 / area};
+  float angle = coef.x * pi * 2.0f;
+  glm::mat3 rotation = yaw(angle) * pitch(-pi / 6.0f);
+
   glm::mat3 mat = rotation * glm::mat3(plane_x, plane_z, start);
-  glm::vec3 pos = {30.0 * sin(coef.x * pi2), -30.0 * cos(coef.x * pi2), 15.0};
+  glm::vec3 pos = {10.0f * sin(angle), -10.0f * cos(angle), 5.0f};
 
   mat[2] += pos;
   params.camera = mat;
-  assert(params.camera[0] == glm::vec4(mat[0], 0));
   params.cam_pos = glm::vec4{pos, 0};
-  params.lightPos = {0, -5, 5, 0};
+  params.lightPos = {0, -5, 5};
   params.time = time;
-  params.resolution = glm::vec4{resolution, 0, 0};
 }
 
 void App::drawFrame()
@@ -181,92 +216,65 @@ void App::drawFrame()
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
 
     {
-      // Init
-      etna::set_state(
-        currentCmdBuf,
-        storage.get(),
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::AccessFlagBits2::eShaderWrite,
-        vk::ImageLayout::eGeneral,
-        vk::ImageAspectFlagBits::eColor);
+      {
+        etna::RenderTargetState state(
+          currentCmdBuf, {{}, {256, 256}}, {{procTexImage.get(), procTexImage.getView({})}}, {});
+        currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, procTexPipe.getVkPipeline());
+
+        currentCmdBuf.pushConstants<float>(
+          procTexPipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {time});
+        currentCmdBuf.draw(3, 1, 0, 0);
+      }
       etna::flush_barriers(currentCmdBuf);
-
-      // Pipeline
-
-      auto storageBinding = storage.genBinding(defaultSampler.get(), vk::ImageLayout::eGeneral);
-      auto info = etna::get_shader_program("comp");
-
-      auto descriptorSet = etna::create_descriptor_set(
-        info.getDescriptorLayoutId(0), currentCmdBuf, {etna::Binding{0, storageBinding}});
-
-      auto vkSet = descriptorSet.getVkSet();
-
-      currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, pipe.getVkPipeline());
-      currentCmdBuf.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute, pipe.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
-
-      currentCmdBuf.pushConstants<UniformParams>(
-        pipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, {params});
-
-      etna::flush_barriers(currentCmdBuf);
-
-      currentCmdBuf.dispatch((resolution.x + 31) / 32 + 1, (resolution.y + 31) / 32 + 1, 1);
-
-      etna::flush_barriers(currentCmdBuf);
-      // Change layout
 
       etna::set_state(
         currentCmdBuf,
-        storage.get(),
-        vk::PipelineStageFlagBits2::eBlit,
-        vk::AccessFlagBits2::eTransferRead,
-        vk::ImageLayout::eGeneral,
-        vk::ImageAspectFlagBits::eColor);
-      etna::set_state(
-        currentCmdBuf,
-        backbuffer,
-        vk::PipelineStageFlagBits2::eBlit,
-        vk::AccessFlagBits2::eTransferWrite,
-        vk::ImageLayout::eTransferDstOptimal,
+        procTexImage.get(),
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        {vk::AccessFlagBits2::eShaderRead},
+        vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::ImageAspectFlagBits::eColor);
       etna::flush_barriers(currentCmdBuf);
 
-      // Blit
-      std::array<vk::Offset3D, 2> srcOffset = {
-        vk::Offset3D{},
-        vk::Offset3D{static_cast<int32_t>(resolution.x), static_cast<int32_t>(resolution.y), 1}};
-      auto srdImageSubrecourceLayers = vk::ImageSubresourceLayers{
-        .aspectMask = vk::ImageAspectFlagBits::eColor,
-        .mipLevel = 0,
-        .baseArrayLayer = 0,
-        .layerCount = 1};
 
-      // Destination info
-      std::array<vk::Offset3D, 2> dstOffset = {
-        vk::Offset3D{},
-        vk::Offset3D{static_cast<int32_t>(resolution.x), static_cast<int32_t>(resolution.y), 1}};
+      {
 
-      auto dstImageSubrecourceLayers = vk::ImageSubresourceLayers{
-        .aspectMask = vk::ImageAspectFlagBits::eColor,
-        .mipLevel = 0,
-        .baseArrayLayer = 0,
-        .layerCount = 1};
-      // Create blit info
-      auto imageBlit = vk::ImageBlit{
-        .srcSubresource = srdImageSubrecourceLayers,
-        .srcOffsets = srcOffset,
-        .dstSubresource = dstImageSubrecourceLayers,
-        .dstOffsets = dstOffset};
+        etna::RenderTargetState state(
+          currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
 
-      currentCmdBuf.blitImage(
-        storage.get(),
-        vk::ImageLayout::eGeneral,
-        backbuffer,
-        vk::ImageLayout::eTransferDstOptimal,
-        1,
-        &imageBlit,
-        vk::Filter::eLinear);
+        auto info = etna::get_shader_program("toy");
+
+        auto brassTextureBind =
+          brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+        auto procTextureBind =
+          procTexImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+        auto descriptorSet = etna::create_descriptor_set(
+          info.getDescriptorLayoutId(0),
+          currentCmdBuf,
+          {etna::Binding{0, brassTextureBind}, etna::Binding{1, procTextureBind}});
+        auto vkSet = descriptorSet.getVkSet();
+
+        currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
+        currentCmdBuf.bindDescriptorSets(
+          vk::PipelineBindPoint::eGraphics,
+          mainPipeline.getVkPipelineLayout(),
+          0,
+          1,
+          &vkSet,
+          0,
+          nullptr);
+
+        AlignedBuffer<UniformParams> buf{};
+        memcpy_aligned_std430(buf, params);
+
+        currentCmdBuf.pushConstants<AlignedBuffer<UniformParams>>(
+          mainPipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {buf});
+
+        currentCmdBuf.draw(3, 1, 0, 0);
+      }
       etna::flush_barriers(currentCmdBuf);
+
+
       etna::set_state(
         currentCmdBuf,
         backbuffer,
