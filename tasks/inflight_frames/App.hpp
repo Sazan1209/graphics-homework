@@ -19,7 +19,11 @@ public:
   void run();
 
 private:
+  void uploadTexture();
+  void compileShaders();
   void drawFrame();
+  void drawProcTexture(vk::CommandBuffer& currentCmdBuf);
+  void drawMainImage(vk::CommandBuffer& currentCmdBuf, vk::Image& backbuffer, vk::ImageView& backbufferView);
   void updateParams();
   void getInput();
 
