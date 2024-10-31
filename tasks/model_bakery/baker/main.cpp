@@ -1,7 +1,7 @@
 #include "baker.hpp"
 #include <iostream>
 
-int main(int argc, char* argc[])
+int main(int argc, char* argv[])
 {
   if (argc != 2)
   {
