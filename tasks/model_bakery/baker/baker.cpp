@@ -355,7 +355,7 @@ void Baker::bakeScene(std::filesystem::path path)
         vertex_attrs[0].maxValues.assign(relem.posMax.begin(), relem.posMax.end());
 
         {
-          prim.indices = model.accessors.size();
+          prim.indices = static_cast<int>(model.accessors.size());
           auto& curr = model.accessors.emplace_back(ind_access);
           curr.byteOffset += relem.indexOffset * sizeof(uint32_t);
           curr.count = relem.indexCount;
@@ -376,7 +376,7 @@ void Baker::bakeScene(std::filesystem::path path)
           {
             continue;
           }
-          prim.attributes[attr_names[k]] = model.accessors.size();
+          prim.attributes[attr_names[k]] = static_cast<int>(model.accessors.size());
           auto& curr = model.accessors.emplace_back(vertex_attrs[k]);
           curr.byteOffset += relem.vertexOffset * sizeof(Vertex);
           curr.count = relem.vertexCount;
