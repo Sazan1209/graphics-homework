@@ -59,7 +59,7 @@ private:
   };
   ProcessedMeshes processMeshes(const tinygltf::Model& model) const;
   void ProcessAttribute(
-    const tinygltf::Model& model, int accesor_ind, std::span<Vertex>& vertices, auto setter) const;
+    const tinygltf::Model& model, int accesor_ind, std::span<Vertex> vertices, auto setter) const;
 
 private:
   tinygltf::TinyGLTF loader;
