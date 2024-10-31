@@ -58,7 +58,9 @@ static std::uint32_t encode_normal(glm::vec4 normal)
 
   int8_t arr[4] = {x, y, z, w};
 
-  return std::bit_cast<uint32_t>(arr);
+  auto res = std::bit_cast<uint32_t>(arr);
+
+  return res;
 }
 
 static std::uint32_t encode_normal(glm::vec3 normal)
@@ -163,9 +165,9 @@ Baker::ProcessedMeshes Baker::processMeshes(const tinygltf::Model& model) const
         .indexOffset = static_cast<std::uint32_t>(result.indices.size()),
         .indexCount = static_cast<std::uint32_t>(model.accessors[prim.indices].count),
         .posMax =
-          {std::numeric_limits<double>::min(),
-           std::numeric_limits<double>::min(),
-           std::numeric_limits<double>::min()},
+          {std::numeric_limits<double>::lowest(), // fuck numeric limits
+           std::numeric_limits<double>::lowest(),
+           std::numeric_limits<double>::lowest()},
         .posMin = {
           std::numeric_limits<double>::max(),
           std::numeric_limits<double>::max(),
@@ -349,19 +351,29 @@ void Baker::bakeScene(std::filesystem::path path)
       {
         auto& prim = mesh.primitives[j];
         auto& relem = relems[meshes[i].firstRelem + j];
-        vertex_attrs[0].minValues.assign(
-          relem.posMin.begin(), relem.posMin.end()); // required, for some reason
+        vertex_attrs[0].minValues.assign(relem.posMin.begin(), relem.posMin.end());
         vertex_attrs[0].maxValues.assign(relem.posMax.begin(), relem.posMax.end());
 
-        prim.attributes.clear();
         {
           prim.indices = model.accessors.size();
           auto& curr = model.accessors.emplace_back(ind_access);
           curr.byteOffset += relem.indexOffset * sizeof(uint32_t);
           curr.count = relem.indexCount;
         }
+        std::erase_if(prim.attributes, [&](const auto& type){
+            for (size_t k = 0; k < 4; ++k){
+                if (type.first == attr_names[k]){
+                    return false;
+                }
+            }
+            return true;
+        });
         for (size_t k = 0; k < 4; ++k)
         {
+          if (!prim.attributes.contains(attr_names[k]))
+          {
+            continue;
+          }
           prim.attributes[attr_names[k]] = model.accessors.size();
           auto& curr = model.accessors.emplace_back(vertex_attrs[k]);
           curr.byteOffset += relem.vertexOffset * sizeof(Vertex);

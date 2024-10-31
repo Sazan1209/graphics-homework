@@ -371,6 +371,53 @@ void SceneManager::uploadData(
   transferHelper.uploadBuffer<std::uint32_t>(*oneShotCommands, unifiedIbuf, 0, indices);
 }
 
+
+SceneManager::ProcessedMeshesBaked SceneManager::processMeshesBaked(
+  const tinygltf::Model& model) const
+{
+
+  ProcessedMeshesBaked result;
+
+  {
+    std::size_t totalPrimitives = 0;
+    for (const auto& mesh : model.meshes)
+      totalPrimitives += mesh.primitives.size();
+    result.relems.reserve(totalPrimitives);
+  }
+
+  result.meshes.reserve(model.meshes.size());
+
+  for (const auto& mesh : model.meshes)
+  {
+    result.meshes.push_back(Mesh{
+      .firstRelem = static_cast<std::uint32_t>(result.relems.size()),
+      .relemCount = static_cast<std::uint32_t>(mesh.primitives.size()),
+    });
+
+    for (const auto& prim : mesh.primitives)
+    {
+      auto& ind_accessor = model.accessors[prim.indices];
+      auto& pos_accessor = model.accessors[prim.attributes.at("POSITION")];
+
+      result.relems.push_back(RenderElement{
+        .vertexOffset = static_cast<std::uint32_t>(pos_accessor.byteOffset / sizeof(Vertex)),
+        .indexOffset = static_cast<std::uint32_t>(ind_accessor.byteOffset / sizeof(uint32_t)),
+        .indexCount = static_cast<std::uint32_t>(ind_accessor.count),
+      });
+    }
+  }
+
+  {
+    auto ptr = model.buffers[0].data.data();
+    auto vertex_count = model.bufferViews[0].byteLength / sizeof(Vertex);
+    auto index_count = model.bufferViews[1].byteLength / sizeof(uint32_t);
+    result.indices = {reinterpret_cast<const uint32_t*>(ptr + vertex_count * sizeof(Vertex)), index_count};
+    result.vertices = {reinterpret_cast<const Vertex*>(ptr), vertex_count};
+  }
+
+  return result;
+}
+
 void SceneManager::selectScene(std::filesystem::path path)
 {
   auto maybeModel = loadModel(path);
@@ -410,4 +457,25 @@ etna::VertexByteStreamFormatDescription SceneManager::getVertexFormatDescription
         .offset = sizeof(glm::vec4),
       },
     }};
+}
+
+void SceneManager::selectScenePrebaked(std::filesystem::path path)
+{
+  auto maybeModel = loadModel(path);
+  if (!maybeModel.has_value())
+    return;
+
+  auto model = std::move(*maybeModel);
+
+  // NOTE: you might want to store these on the GPU for GPU-driven rendering.
+  auto [instMats, instMeshes] = processInstances(model);
+  instanceMatrices = std::move(instMats);
+  instanceMeshes = std::move(instMeshes);
+
+  auto [verts, inds, relems, meshs] = processMeshesBaked(model);
+
+  renderElements = std::move(relems);
+  meshes = std::move(meshs);
+
+  uploadData(verts, inds);
 }

@@ -9,6 +9,8 @@
 #include <etna/BlockingTransferHelper.hpp>
 #include <etna/VertexInput.hpp>
 
+#include <stb_image.h>
+
 struct RenderElement
 {
   std::uint32_t vertexOffset;

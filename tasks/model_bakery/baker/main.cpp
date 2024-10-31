@@ -1,14 +1,8 @@
 #include "baker.hpp"
 #include <iostream>
 
-
-int main(int argc, char* argv[])
+int main(int, char*[])
 {
-  if (argc != 2)
-  {
-    std::cerr << "Expected exactly one argument\n";
-    return 1;
-  }
   Baker baker;
-  baker.bakeScene(argv[1]);
+  baker.bakeScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes/low_poly_dark_town/scene.gltf");
 }

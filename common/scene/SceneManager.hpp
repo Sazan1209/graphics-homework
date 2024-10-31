@@ -35,6 +35,7 @@ public:
   SceneManager();
 
   void selectScene(std::filesystem::path path);
+  void selectScenePrebaked(std::filesystem::path path);
 
   // Every instance is a mesh drawn with a certain transform
   // NOTE: maybe you can pass some additional data through unused matrix entries?
@@ -80,8 +81,17 @@ private:
     std::vector<RenderElement> relems;
     std::vector<Mesh> meshes;
   };
+
+  struct ProcessedMeshesBaked
+  {
+      std::span<const Vertex> vertices;
+      std::span<const std::uint32_t> indices;
+      std::vector<RenderElement> relems;
+      std::vector<Mesh> meshes;
+  };
   ProcessedMeshes processMeshes(const tinygltf::Model& model) const;
-  void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t>);
+  void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
+  ProcessedMeshesBaked processMeshesBaked(const tinygltf::Model& model) const;
 
 private:
   tinygltf::TinyGLTF loader;
