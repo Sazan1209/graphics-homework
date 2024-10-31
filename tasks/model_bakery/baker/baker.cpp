@@ -69,7 +69,7 @@ static std::uint32_t encode_normal(glm::vec3 normal)
 }
 
 void Baker::ProcessAttribute(
-  const tinygltf::Model& model, int accessor_ind, std::span<Vertex>& vertices, auto setter) const
+  const tinygltf::Model& model, int accessor_ind, std::span<Vertex> vertices, auto setter) const
 {
   auto& accessor = model.accessors[accessor_ind];
   auto& bufView = model.bufferViews[accessor.bufferView];
