@@ -411,7 +411,8 @@ SceneManager::ProcessedMeshesBaked SceneManager::processMeshesBaked(
     auto ptr = model.buffers[0].data.data();
     auto vertex_count = model.bufferViews[0].byteLength / sizeof(Vertex);
     auto index_count = model.bufferViews[1].byteLength / sizeof(uint32_t);
-    result.indices = {reinterpret_cast<const uint32_t*>(ptr + vertex_count * sizeof(Vertex)), index_count};
+    result.indices = {
+      reinterpret_cast<const uint32_t*>(ptr + vertex_count * sizeof(Vertex)), index_count};
     result.vertices = {reinterpret_cast<const Vertex*>(ptr), vertex_count};
   }
 

@@ -84,10 +84,10 @@ private:
 
   struct ProcessedMeshesBaked
   {
-      std::span<const Vertex> vertices;
-      std::span<const std::uint32_t> indices;
-      std::vector<RenderElement> relems;
-      std::vector<Mesh> meshes;
+    std::span<const Vertex> vertices;
+    std::span<const std::uint32_t> indices;
+    std::vector<RenderElement> relems;
+    std::vector<Mesh> meshes;
   };
   ProcessedMeshes processMeshes(const tinygltf::Model& model) const;
   void uploadData(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);

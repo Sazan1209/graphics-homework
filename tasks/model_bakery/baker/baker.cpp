@@ -88,7 +88,7 @@ void Baker::ProcessAttribute(
 
 static void updateMinMax(RenderElement& relem, glm::vec3 curr)
 {
-  for (size_t i = 0; i < 3; ++i)
+  for (uint32_t i = 0; i < 3; ++i)
   {
     relem.posMin[i] = std::min(relem.posMin[i], static_cast<double>(curr[i]));
     relem.posMax[i] = std::max(relem.posMax[i], static_cast<double>(curr[i]));
@@ -283,7 +283,7 @@ void Baker::bakeScene(std::filesystem::path path)
     std::memcpy(buf.data.data(), verts.data(), verts.size() * sizeof(Vertex));
     std::memcpy(
       buf.data.data() + verts.size() * sizeof(Vertex), inds.data(), inds.size() * sizeof(uint32_t));
-    buf.uri = (path.stem() += "_baked.bin");
+    buf.uri = (path.stem() += "_baked.bin").string();
 
     // create file itself?
   }
@@ -360,13 +360,15 @@ void Baker::bakeScene(std::filesystem::path path)
           curr.byteOffset += relem.indexOffset * sizeof(uint32_t);
           curr.count = relem.indexCount;
         }
-        std::erase_if(prim.attributes, [&](const auto& type){
-            for (size_t k = 0; k < 4; ++k){
-                if (type.first == attr_names[k]){
-                    return false;
-                }
+        std::erase_if(prim.attributes, [&](const auto& type) {
+          for (size_t k = 0; k < 4; ++k)
+          {
+            if (type.first == attr_names[k])
+            {
+              return false;
             }
-            return true;
+          }
+          return true;
         });
         for (size_t k = 0; k < 4; ++k)
         {
@@ -385,5 +387,10 @@ void Baker::bakeScene(std::filesystem::path path)
 
 
   loader.WriteGltfSceneToFile(
-    &model, path.parent_path() / path.stem() += "_baked.gltf", false, false, true, false);
+    &model,
+    (path.parent_path() / path.stem() += "_baked.gltf").string(),
+    false,
+    false,
+    true,
+    false);
 }
