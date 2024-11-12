@@ -13,7 +13,7 @@ layout(push_constant) uniform params_t
 }
 params;
 
-layout(std430, binding = 0) buffer matr
+layout(std430, binding = 0) restrict readonly buffer matr
 {
   mat4 mModels[];
 };
