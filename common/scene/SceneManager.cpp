@@ -113,21 +113,32 @@ SceneManager::ProcessedInstances SceneManager::processInstances(const tinygltf::
 
   ProcessedInstances result;
 
+  std::vector<std::size_t> meshBucketCounts(model.meshes.size());
+
   // Don't overallocate matrices, they are pretty chonky.
   {
     std::size_t totalNodesWithMeshes = 0;
     for (std::size_t i = 0; i < model.nodes.size(); ++i)
       if (model.nodes[i].mesh >= 0)
+      {
         ++totalNodesWithMeshes;
-    result.matrices.reserve(totalNodesWithMeshes);
-    result.meshes.reserve(totalNodesWithMeshes);
+        ++meshBucketCounts[model.nodes[i].mesh];
+      }
+    result.matrices.resize(totalNodesWithMeshes);
+    result.meshes.resize(totalNodesWithMeshes);
+  }
+
+  for (size_t i = 1; i < meshBucketCounts.size(); ++i)
+  {
+    meshBucketCounts[i] += meshBucketCounts[i - 1];
   }
 
   for (std::size_t i = 0; i < model.nodes.size(); ++i)
     if (model.nodes[i].mesh >= 0)
     {
-      result.matrices.push_back(nodeTransforms[i]);
-      result.meshes.push_back(model.nodes[i].mesh);
+      std::size_t index = --meshBucketCounts[model.nodes[i].mesh];
+      result.matrices[index] = nodeTransforms[i];
+      result.meshes[index] = model.nodes[i].mesh;
     }
 
   return result;
