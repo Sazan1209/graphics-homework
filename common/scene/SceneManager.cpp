@@ -1,5 +1,6 @@
 #include "SceneManager.hpp"
 
+#include <limits>
 #include <stack>
 
 #include <spdlog/spdlog.h>
@@ -202,7 +203,7 @@ SceneManager::ProcessedMeshes SceneManager::processMeshes(const tinygltf::Model&
     result.meshes.push_back(Mesh{
       .firstRelem = static_cast<std::uint32_t>(result.relems.size()),
       .relemCount = static_cast<std::uint32_t>(mesh.primitives.size()),
-    });
+      .box = {}});
 
     for (const auto& prim : mesh.primitives)
     {
@@ -400,15 +401,30 @@ SceneManager::ProcessedMeshesBaked SceneManager::processMeshesBaked(
 
   for (const auto& mesh : model.meshes)
   {
-    result.meshes.push_back(Mesh{
-      .firstRelem = static_cast<std::uint32_t>(result.relems.size()),
-      .relemCount = static_cast<std::uint32_t>(mesh.primitives.size()),
-    });
+    {
+      float min = std::numeric_limits<float>::lowest();
+      float max = std::numeric_limits<float>::max();
+      result.meshes.push_back(Mesh{
+        .firstRelem = static_cast<std::uint32_t>(result.relems.size()),
+        .relemCount = static_cast<std::uint32_t>(mesh.primitives.size()),
+        .box = {{min, min, min}, {max, max, max}}});
+    }
 
     for (const auto& prim : mesh.primitives)
     {
       auto& ind_accessor = model.accessors[prim.indices];
       auto& pos_accessor = model.accessors[prim.attributes.at("POSITION")];
+
+      {
+        auto& resBox = result.meshes.back().box;
+        auto& currMax = pos_accessor.maxValues;
+        auto& currMin = pos_accessor.minValues;
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+          resBox.maxCoord[i] = std::max(resBox.maxCoord[i], static_cast<float>(currMax[i]));
+          resBox.minCoord[i] = std::min(resBox.minCoord[i], static_cast<float>(currMin[i]));
+        }
+      }
 
       result.relems.push_back(RenderElement{
         .vertexOffset = static_cast<std::uint32_t>(pos_accessor.byteOffset / sizeof(Vertex)),

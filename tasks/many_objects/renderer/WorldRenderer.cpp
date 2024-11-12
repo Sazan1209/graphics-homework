@@ -6,7 +6,6 @@
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
 
-
 WorldRenderer::WorldRenderer()
   : sceneMgr{std::make_unique<SceneManager>()}
 {
@@ -33,9 +32,6 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
   });
 
   modelMatrices.map();
-  const auto& matrices = sceneMgr->getInstanceMatrices();
-  std::memcpy(modelMatrices.data(), matrices.data(), matrices.size_bytes());
-  modelMatrices.unmap();
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -92,7 +88,32 @@ void WorldRenderer::update(const FramePacket& packet)
   {
     const float aspect = float(resolution.x) / float(resolution.y);
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
+    nearPlane = packet.mainCam.zNear;
+    farPlane = packet.mainCam.zFar;
   }
+}
+
+
+bool WorldRenderer::shouldCull(glm::mat4 mModel, BoundingBox box)
+{
+  glm::mat4 mProj = worldViewProj * mModel;
+  for (uint32_t mask = 0; mask < 8; ++mask)
+  {
+    glm::vec3 corner;
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+      corner[i] = (mask & (1u << i)) ? box.maxCoord[i] : box.minCoord[i];
+    }
+    glm::vec3 proj = mProj * glm::vec4(corner, 1);
+    float xCos = abs(proj.x / sqrt(proj.x * proj.x + proj.z * proj.z));
+    float yCos = abs(proj.y / sqrt(proj.y * proj.y + proj.z * proj.z));
+    // Empirically, the magic constant here is 0.75. Not sure why, thought it was 0.5
+    if (xCos <= 0.75 && yCos <= 0.75 && nearPlane <= proj.z && proj.z <= farPlane)
+    {
+      return false;
+    }
+  }
+  return true;
 }
 
 void WorldRenderer::renderScene(
@@ -115,22 +136,40 @@ void WorldRenderer::renderScene(
 
 
   auto instanceMeshes = sceneMgr->getInstanceMeshes();
+  auto instanceMatrices = sceneMgr->getInstanceMatrices();
 
   auto meshes = sceneMgr->getMeshes();
   auto relems = sceneMgr->getRenderElements();
 
   for (std::size_t instIdx = 0; instIdx < instanceMeshes.size(); ++instIdx)
   {
-    cmd_buf.pushConstants<glm::mat4>(pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, glob_tm);
-
     const auto meshIdx = instanceMeshes[instIdx];
+
+    std::size_t nextIdx = instIdx;
+    std::size_t nonCulled = 0;
+    while (nextIdx < instanceMeshes.size() && instanceMeshes[nextIdx] == meshIdx)
+    {
+      if (!shouldCull(instanceMatrices[nextIdx], sceneMgr->getMeshes()[meshIdx].box))
+      {
+        std::memcpy(
+          modelMatrices.data() + (nonCulled + instIdx) * sizeof(glm::mat4),
+          &instanceMatrices[nextIdx],
+          sizeof(glm::mat4));
+        nonCulled += 1;
+      }
+      ++nextIdx;
+    }
+
+    cmd_buf.pushConstants<glm::mat4>(pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, glob_tm);
 
     for (std::size_t j = 0; j < meshes[meshIdx].relemCount; ++j)
     {
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
       const auto& relem = relems[relemIdx];
-      cmd_buf.drawIndexed(relem.indexCount, 1, relem.indexOffset, relem.vertexOffset, instIdx);
+      cmd_buf.drawIndexed(
+        relem.indexCount, nonCulled, relem.indexOffset, relem.vertexOffset, instIdx);
     }
+    instIdx = nextIdx - 1;
   }
 }
 

@@ -4,6 +4,7 @@
 #include <etna/Sampler.hpp>
 #include <etna/Buffer.hpp>
 #include <etna/GraphicsPipeline.hpp>
+#include <etna/GpuSharedResource.hpp>
 #include <glm/glm.hpp>
 
 #include "scene/SceneManager.hpp"
@@ -33,6 +34,8 @@ private:
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
 
+  bool shouldCull(glm::mat4 mModel, BoundingBox box);
+
 private:
   std::unique_ptr<SceneManager> sceneMgr;
 
@@ -41,6 +44,8 @@ private:
 
   glm::mat4x4 worldViewProj;
   glm::mat4x4 lightMatrix;
+  float nearPlane;
+  float farPlane;
 
   etna::GraphicsPipeline staticMeshPipeline{};
 

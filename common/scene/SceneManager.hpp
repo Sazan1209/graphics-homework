@@ -9,6 +9,7 @@
 #include <etna/VertexInput.hpp>
 
 
+
 // A single render element (relem) corresponds to a single draw call
 // of a certain pipeline with specific bindings (including material data)
 struct RenderElement
@@ -20,6 +21,11 @@ struct RenderElement
   // Material* material;
 };
 
+struct BoundingBox{
+  std::array<float, 3> maxCoord;
+  std::array<float, 3> minCoord;
+};
+
 // A mesh is a collection of relems. A scene may have the same mesh
 // located in several different places, so a scene consists of **instances**,
 // not meshes.
@@ -27,6 +33,8 @@ struct Mesh
 {
   std::uint32_t firstRelem;
   std::uint32_t relemCount;
+
+  BoundingBox box;
 };
 
 class SceneManager
