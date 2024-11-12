@@ -33,18 +33,11 @@ private:
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
 
-
 private:
   std::unique_ptr<SceneManager> sceneMgr;
 
   etna::Image mainViewDepth;
-  etna::Buffer constants;
-
-  struct PushConstants
-  {
-    glm::mat4x4 projView;
-    glm::mat4x4 model;
-  } pushConst2M;
+  etna::Buffer modelMatrices;
 
   glm::mat4x4 worldViewProj;
   glm::mat4x4 lightMatrix;

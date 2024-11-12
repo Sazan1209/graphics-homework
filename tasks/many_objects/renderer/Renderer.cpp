@@ -32,6 +32,8 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
     .physicalDeviceIndexOverride = {},
     .numFramesInFlight = 2,
   });
+
+  worldRenderer = std::make_unique<WorldRenderer>();
 }
 
 void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvider res_provider)
@@ -52,8 +54,6 @@ void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvi
   });
 
   resolution = {w, h};
-
-  worldRenderer = std::make_unique<WorldRenderer>();
 
   worldRenderer->allocateResources(resolution);
   worldRenderer->loadShaders();

@@ -24,6 +24,18 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .format = vk::Format::eD32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment,
   });
+
+  modelMatrices = ctx.createBuffer(etna::Buffer::CreateInfo{
+    .size = sceneMgr->getInstanceMatrices().size_bytes(),
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+    .name = "model_matrices",
+  });
+
+  modelMatrices.map();
+  const auto& matrices = sceneMgr->getInstanceMatrices();
+  std::memcpy(modelMatrices.data(), matrices.data(), matrices.size_bytes());
+  modelMatrices.unmap();
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -91,21 +103,25 @@ void WorldRenderer::renderScene(
 
   cmd_buf.bindVertexBuffers(0, {sceneMgr->getVertexBuffer()}, {0});
   cmd_buf.bindIndexBuffer(sceneMgr->getIndexBuffer(), 0, vk::IndexType::eUint32);
+  {
+    auto info = etna::get_shader_program("static_mesh_material");
 
-  pushConst2M.projView = glob_tm;
+    auto set = etna::create_descriptor_set(
+      info.getDescriptorLayoutId(0), cmd_buf, {etna::Binding{0, modelMatrices.genBinding()}});
+    vk::DescriptorSet vkSet = set.getVkSet();
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, 1, &vkSet, 0, nullptr);
+  }
+
 
   auto instanceMeshes = sceneMgr->getInstanceMeshes();
-  auto instanceMatrices = sceneMgr->getInstanceMatrices();
 
   auto meshes = sceneMgr->getMeshes();
   auto relems = sceneMgr->getRenderElements();
 
   for (std::size_t instIdx = 0; instIdx < instanceMeshes.size(); ++instIdx)
   {
-    pushConst2M.model = instanceMatrices[instIdx];
-
-    cmd_buf.pushConstants<PushConstants>(
-      pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, {pushConst2M});
+    cmd_buf.pushConstants<glm::mat4>(pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, glob_tm);
 
     const auto meshIdx = instanceMeshes[instIdx];
 
@@ -113,7 +129,7 @@ void WorldRenderer::renderScene(
     {
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
       const auto& relem = relems[relemIdx];
-      cmd_buf.drawIndexed(relem.indexCount, 1, relem.indexOffset, relem.vertexOffset, 0);
+      cmd_buf.drawIndexed(relem.indexCount, 1, relem.indexOffset, relem.vertexOffset, instIdx);
     }
   }
 }
