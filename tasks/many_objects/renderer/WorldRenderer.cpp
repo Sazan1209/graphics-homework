@@ -171,7 +171,11 @@ void WorldRenderer::renderScene(
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
       const auto& relem = relems[relemIdx];
       cmd_buf.drawIndexed(
-        relem.indexCount, nonCulled, relem.indexOffset, relem.vertexOffset, instIdx);
+        relem.indexCount,
+        static_cast<uint32_t>(nonCulled),
+        relem.indexOffset,
+        relem.vertexOffset,
+        instIdx);
     }
     instIdx = nextIdx - 1;
   }
