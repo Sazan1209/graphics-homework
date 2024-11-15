@@ -16,7 +16,7 @@
 class WorldRenderer
 {
 public:
-  WorldRenderer();
+  WorldRenderer(const etna::GpuWorkCount& workCount);
 
   void loadScene(std::filesystem::path path);
 
@@ -40,7 +40,7 @@ private:
   std::unique_ptr<SceneManager> sceneMgr;
 
   etna::Image mainViewDepth;
-  etna::Buffer modelMatrices;
+  etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
   glm::mat4x4 worldViewProj;
   glm::mat4x4 lightMatrix;

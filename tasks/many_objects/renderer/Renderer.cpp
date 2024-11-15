@@ -9,6 +9,7 @@
 
 Renderer::Renderer(glm::uvec2 res)
   : resolution{res}
+  , workCount{numFramesInFlight}
 {
 }
 
@@ -30,10 +31,10 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
     .deviceExtensions = deviceExtensions,
     .features = vk::PhysicalDeviceFeatures2{.features = {}},
     .physicalDeviceIndexOverride = {},
-    .numFramesInFlight = 2,
+    .numFramesInFlight = numFramesInFlight,
   });
 
-  worldRenderer = std::make_unique<WorldRenderer>();
+  worldRenderer = std::make_unique<WorldRenderer>(workCount);
 }
 
 void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvider res_provider)
@@ -140,6 +141,7 @@ void Renderer::drawFrame()
     ETNA_VERIFY((resolution == glm::uvec2{w, h}));
   }
 
+  workCount.submit();
   etna::end_frame();
 }
 

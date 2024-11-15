@@ -6,8 +6,10 @@
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
 
-WorldRenderer::WorldRenderer()
+WorldRenderer::WorldRenderer(const etna::GpuWorkCount& workCount)
   : sceneMgr{std::make_unique<SceneManager>()}
+  , modelMatrices{workCount, std::in_place_t()}
+
 {
 }
 
@@ -24,14 +26,16 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment,
   });
 
-  modelMatrices = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = sceneMgr->getInstanceMatrices().size_bytes(),
-    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
-    .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
-    .name = "model_matrices",
-  });
+  modelMatrices.iterate([&](auto& buf) {
+    buf = ctx.createBuffer(etna::Buffer::CreateInfo{
+      .size = sceneMgr->getInstanceMatrices().size_bytes(),
+      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+      .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+      .name = "model_matrices",
+    });
 
-  modelMatrices.map();
+    buf.map();
+  });
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -128,7 +132,7 @@ void WorldRenderer::renderScene(
     auto info = etna::get_shader_program("static_mesh_material");
 
     auto set = etna::create_descriptor_set(
-      info.getDescriptorLayoutId(0), cmd_buf, {etna::Binding{0, modelMatrices.genBinding()}});
+      info.getDescriptorLayoutId(0), cmd_buf, {etna::Binding{0, modelMatrices.get().genBinding()}});
     vk::DescriptorSet vkSet = set.getVkSet();
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, 1, &vkSet, 0, nullptr);
@@ -152,7 +156,7 @@ void WorldRenderer::renderScene(
       if (!shouldCull(instanceMatrices[nextIdx], sceneMgr->getMeshes()[meshIdx].box))
       {
         std::memcpy(
-          modelMatrices.data() + (nonCulled + instIdx) * sizeof(glm::mat4),
+          modelMatrices.get().data() + (nonCulled + instIdx) * sizeof(glm::mat4),
           &instanceMatrices[nextIdx],
           sizeof(glm::mat4));
         nonCulled += 1;

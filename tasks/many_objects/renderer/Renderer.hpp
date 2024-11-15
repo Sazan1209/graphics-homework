@@ -29,6 +29,7 @@ public:
   void drawFrame();
 
 private:
+  static constexpr std::size_t numFramesInFlight = 2;
   ResolutionProvider resolutionProvider;
 
   std::unique_ptr<etna::Window> window;
@@ -38,4 +39,7 @@ private:
   bool useVsync = true;
 
   std::unique_ptr<WorldRenderer> worldRenderer;
+  etna::GpuWorkCount workCount;
+
+
 };
