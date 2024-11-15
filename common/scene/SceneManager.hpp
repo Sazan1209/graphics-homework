@@ -9,7 +9,6 @@
 #include <etna/VertexInput.hpp>
 
 
-
 // A single render element (relem) corresponds to a single draw call
 // of a certain pipeline with specific bindings (including material data)
 struct RenderElement
@@ -21,7 +20,8 @@ struct RenderElement
   // Material* material;
 };
 
-struct BoundingBox{
+struct BoundingBox
+{
   std::array<float, 3> maxCoord;
   std::array<float, 3> minCoord;
 };

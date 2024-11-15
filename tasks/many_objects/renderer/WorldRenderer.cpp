@@ -35,7 +35,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     });
 
     buf.map();
-  });
+  };
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -166,7 +166,7 @@ void WorldRenderer::renderScene(
 
     cmd_buf.pushConstants<glm::mat4>(pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, glob_tm);
 
-    for (std::size_t j = 0; j < meshes[meshIdx].relemCount; ++j)
+    for (uint32_t j = 0; j < meshes[meshIdx].relemCount; ++j)
     {
       const auto relemIdx = meshes[meshIdx].firstRelem + j;
       const auto& relem = relems[relemIdx];
