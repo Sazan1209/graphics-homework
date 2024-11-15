@@ -35,7 +35,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     });
 
     buf.map();
-  };
+  });
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)

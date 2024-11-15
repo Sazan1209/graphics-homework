@@ -40,6 +40,4 @@ private:
 
   std::unique_ptr<WorldRenderer> worldRenderer;
   etna::GpuWorkCount workCount;
-
-
 };
