@@ -175,7 +175,7 @@ void WorldRenderer::renderScene(
         static_cast<uint32_t>(nonCulled),
         relem.indexOffset,
         relem.vertexOffset,
-        instIdx);
+        static_cast<uint32_t>(instIdx));
     }
     instIdx = nextIdx - 1;
   }
