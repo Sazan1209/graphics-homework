@@ -200,11 +200,11 @@ void App::drawProcTexture(vk::CommandBuffer& currentCmdBuf)
     ETNA_PROFILE_GPU(currentCmdBuf, procImage);
     {
       etna::RenderTargetState state(
-          currentCmdBuf, {{}, {256, 256}}, {{procTexImage.get(), procTexImage.getView({})}}, {});
+        currentCmdBuf, {{}, {256, 256}}, {{procTexImage.get(), procTexImage.getView({})}}, {});
       currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, procTexPipe.getVkPipeline());
 
       currentCmdBuf.pushConstants<float>(
-          procTexPipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {time});
+        procTexPipe.getVkPipelineLayout(), vk::ShaderStageFlagBits::eFragment, 0, {time});
       currentCmdBuf.draw(3, 1, 0, 0);
     }
 
@@ -227,31 +227,31 @@ void App::drawMainImage(
     ETNA_PROFILE_GPU(currentCmdBuf, mainImage);
     {
       etna::RenderTargetState state(
-          currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
+        currentCmdBuf, {{}, {resolution.x, resolution.y}}, {{backbuffer, backbufferView}}, {});
 
       auto info = etna::get_shader_program("toy");
 
       auto brassTextureBind =
-          brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+        brassTexture.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
       auto procTextureBind =
-          procTexImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+        procTexImage.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
       auto descriptorSet = etna::create_descriptor_set(
-          info.getDescriptorLayoutId(0),
-          currentCmdBuf,
-          {etna::Binding{0, brassTextureBind},
-           etna::Binding{1, procTextureBind},
-           etna::Binding{2, constants.get().genBinding()}});
+        info.getDescriptorLayoutId(0),
+        currentCmdBuf,
+        {etna::Binding{0, brassTextureBind},
+         etna::Binding{1, procTextureBind},
+         etna::Binding{2, constants.get().genBinding()}});
       auto vkSet = descriptorSet.getVkSet();
 
       currentCmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, mainPipeline.getVkPipeline());
       currentCmdBuf.bindDescriptorSets(
-          vk::PipelineBindPoint::eGraphics,
-          mainPipeline.getVkPipelineLayout(),
-          0,
-          1,
-          &vkSet,
-          0,
-          nullptr);
+        vk::PipelineBindPoint::eGraphics,
+        mainPipeline.getVkPipelineLayout(),
+        0,
+        1,
+        &vkSet,
+        0,
+        nullptr);
 
       AlignedBuffer<UniformParams> buf{};
       memcpy_aligned_std430(buf, params);
