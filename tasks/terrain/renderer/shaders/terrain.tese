@@ -33,7 +33,7 @@ vec3 calcNorm(vec2 texCoord){
   float right = textureOffset(perlinNoise, texCoord, ivec2(1, 0)).x;
   float down = textureOffset(perlinNoise, texCoord, ivec2(0, -1)).x;
   float up = textureOffset(perlinNoise, texCoord, ivec2(0, 1)).x;
-  return normalize(vec3(left - right, down - up, 2.0));
+  return normalize(vec3(left - right, 2.0, down - up));
 }
 
 void main()
