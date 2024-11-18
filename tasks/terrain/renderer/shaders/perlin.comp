@@ -48,13 +48,14 @@ float perlin(in vec2 pixCoord)
   n1 = dotGridGradient(pixCoord, ivec2(x1, y1));
   float ix1 = mix(n0, n1, s.x);
 
-  return (mix(ix0, ix1, s.y) + 1.0) / 2.0;
+  return mix(ix0, ix1, s.y);
 }
 
 void main()
 {
   uvec2 idxy = gl_GlobalInvocationID.xy;
   vec2 pixCoord = vec2(idxy);
-  float res = perlin(pixCoord / 32);
+  float res = mix(perlin(pixCoord / 1024), perlin(pixCoord / 128),  0.2);
+  res = mix(res, perlin(pixCoord / 4), 0.01);
   imageStore(resultImage, ivec2(idxy), vec4(res));
 }

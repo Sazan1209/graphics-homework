@@ -35,6 +35,7 @@ private:
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
   void createTerrainMap(vk::CommandBuffer cmd_buf);
+  void renderTerrain(vk::CommandBuffer cmd_buf);
 
   bool shouldCull(glm::mat4 mModel, BoundingBox box);
 
@@ -46,12 +47,20 @@ private:
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
   glm::mat4x4 worldViewProj;
+  glm::vec3 eye;
   glm::mat4x4 lightMatrix;
   float nearPlane;
   float farPlane;
 
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::ComputePipeline perlinPipeline{};
+  etna::GraphicsPipeline terrainPipeline{};
+
+  struct TerrainPushConst{
+    glm::mat4 proj;
+    glm::vec3 eye;
+  };
+
   etna::Sampler perlinSampler;
 
   glm::uvec2 resolution;

@@ -13,4 +13,7 @@ target_add_shaders(terrain_renderer
   shaders/static_mesh.frag
   shaders/static_mesh.vert
   shaders/perlin.comp
+  shaders/quad.vert
+  shaders/terrain.tesc
+  shaders/terrain.tese
 )
