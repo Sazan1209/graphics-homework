@@ -56,7 +56,8 @@ private:
   etna::ComputePipeline perlinPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
 
-  struct TerrainPushConst{
+  struct TerrainPushConst
+  {
     glm::mat4 proj;
     glm::vec3 eye;
   };
