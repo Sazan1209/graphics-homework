@@ -4,6 +4,7 @@
 #include <etna/Sampler.hpp>
 #include <etna/Buffer.hpp>
 #include <etna/GraphicsPipeline.hpp>
+#include <etna/ComputePipeline.hpp>
 #include <etna/GpuSharedResource.hpp>
 #include <glm/glm.hpp>
 
@@ -33,6 +34,7 @@ public:
 private:
   void renderScene(
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
+  void createTerrainMap(vk::CommandBuffer cmd_buf);
 
   bool shouldCull(glm::mat4 mModel, BoundingBox box);
 
@@ -40,6 +42,7 @@ private:
   std::unique_ptr<SceneManager> sceneMgr;
 
   etna::Image mainViewDepth;
+  etna::Image perlinTex;
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
   glm::mat4x4 worldViewProj;
@@ -48,6 +51,8 @@ private:
   float farPlane;
 
   etna::GraphicsPipeline staticMeshPipeline{};
+  etna::ComputePipeline perlinPipeline{};
+  etna::Sampler perlinSampler;
 
   glm::uvec2 resolution;
 };

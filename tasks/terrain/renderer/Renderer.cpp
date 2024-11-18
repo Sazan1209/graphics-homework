@@ -56,9 +56,9 @@ void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvi
 
   resolution = {w, h};
 
-  worldRenderer->allocateResources(resolution);
   worldRenderer->loadShaders();
   worldRenderer->setupPipelines(window->getCurrentFormat());
+  worldRenderer->allocateResources(resolution);
 }
 
 void Renderer::loadScene(std::filesystem::path path)

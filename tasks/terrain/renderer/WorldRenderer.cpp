@@ -9,6 +9,7 @@
 WorldRenderer::WorldRenderer(const etna::GpuWorkCount& workCount)
   : sceneMgr{std::make_unique<SceneManager>()}
   , modelMatrices{workCount, std::in_place_t()}
+  , perlinSampler{etna::Sampler::CreateInfo{.filter = vk::Filter::eLinear, .name = "perlinSampler"}}
 
 {
 }
@@ -36,6 +37,20 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 
     buf.map();
   });
+
+  perlinTex = ctx.createImage(etna::Image::CreateInfo{
+    .extent = vk::Extent3D{4096, 4096, 1},
+    .name = "perlin_noise",
+    .format = vk::Format::eR32Sfloat,
+    .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
+
+  auto cmdManager = ctx.createOneShotCmdMgr();
+  auto cmdBuf = cmdManager->start();
+  ETNA_CHECK_VK_RESULT(cmdBuf.begin(vk::CommandBufferBeginInfo{}));
+  createTerrainMap(cmdBuf);
+  ETNA_CHECK_VK_RESULT(cmdBuf.end());
+
+  cmdManager->submitAndWait(cmdBuf);
 }
 
 void WorldRenderer::loadScene(std::filesystem::path path)
@@ -50,6 +65,7 @@ void WorldRenderer::loadShaders()
     {TERRAIN_RENDERER_SHADERS_ROOT "static_mesh.frag.spv",
      TERRAIN_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
   etna::create_program("static_mesh", {TERRAIN_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
+  etna::create_program("perlin", {TERRAIN_RENDERER_SHADERS_ROOT "perlin.comp.spv"});
 }
 
 void WorldRenderer::setupPipelines(vk::Format swapchain_format)
@@ -80,6 +96,8 @@ void WorldRenderer::setupPipelines(vk::Format swapchain_format)
           .depthAttachmentFormat = vk::Format::eD32Sfloat,
         },
     });
+
+  perlinPipeline = pipelineManager.createComputePipeline("perlin", {});
 }
 
 void WorldRenderer::debugInput(const Keyboard&) {}
@@ -199,4 +217,55 @@ void WorldRenderer::renderWorld(
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, staticMeshPipeline.getVkPipeline());
     renderScene(cmd_buf, worldViewProj, staticMeshPipeline.getVkPipelineLayout());
   }
+  {
+    ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
+  }
+}
+
+
+void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
+{
+  auto perlinInfo = etna::get_shader_program("perlin");
+
+  etna::set_state(
+    cmd_buf,
+    perlinTex.get(),
+    vk::PipelineStageFlagBits2::eComputeShader,
+    vk::AccessFlagBits2::eShaderWrite,
+    vk::ImageLayout::eGeneral,
+    vk::ImageAspectFlagBits::eColor);
+
+  auto binding = perlinTex.genBinding(perlinSampler.get(), vk::ImageLayout::eGeneral, {});
+
+  auto set = etna::create_descriptor_set(
+    perlinInfo.getDescriptorLayoutId(0),
+    cmd_buf,
+    {
+      etna::Binding{0, binding},
+    });
+
+  vk::DescriptorSet vkSet = set.getVkSet();
+
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, perlinPipeline.getVkPipeline());
+  cmd_buf.bindDescriptorSets(
+    vk::PipelineBindPoint::eCompute,
+    perlinPipeline.getVkPipelineLayout(),
+    0,
+    1,
+    &vkSet,
+    0,
+    nullptr);
+
+  etna::flush_barriers(cmd_buf);
+
+  cmd_buf.dispatch(4096 / 32, 4096 / 32, 1);
+
+  // etna::set_state(
+  //   cmd_buf,
+  //   perlinTex.get(),
+  //   vk::PipelineStageFlagBits2::eTessellationEvaluationShader,
+  //   vk::AccessFlagBits2::eShaderSampledRead,
+  //   vk::ImageLayout::eReadOnlyOptimal,
+  //   vk::ImageAspectFlagBits::eColor);
+  // etna::flush_barriers(cmd_buf);
 }
