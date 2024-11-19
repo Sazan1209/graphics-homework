@@ -16,4 +16,6 @@ target_add_shaders(terrain_renderer
   shaders/quad.vert
   shaders/terrain.tesc
   shaders/terrain.tese
+  shaders/normal.comp
+  shaders/terrain.frag
 )
