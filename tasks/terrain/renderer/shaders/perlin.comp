@@ -56,6 +56,6 @@ void main()
   uvec2 idxy = gl_GlobalInvocationID.xy;
   vec2 pixCoord = vec2(idxy);
   float res = mix(perlin(pixCoord / 1024), perlin(pixCoord / 128),  0.2);
-  res = mix(res, perlin(pixCoord / 4), 0.01);
+  res = mix(res, perlin(pixCoord / 16), 0.01);
   imageStore(resultImage, ivec2(idxy), vec4(res));
 }

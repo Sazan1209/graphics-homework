@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(quads, equal_spacing, ccw) in;
+layout(quads, equal_spacing, cw) in;
 
 layout(binding = 0) uniform sampler2D perlinNoise;
 layout(push_constant) uniform params_t
@@ -14,6 +14,7 @@ const float zScale = 200.0;
 
 layout(location = 0) in vec3 WorldPos_ES_in[];
 layout(location = 1) in vec2 TexCoord_ES_in[];
+layout(location = 2) in float GridSize[];
 
 layout(location = 0) out VS_OUT
 {
@@ -28,17 +29,21 @@ out gl_PerVertex
   vec4 gl_Position;
 };
 
-vec3 calcNorm(vec2 texCoord){
-  float left = textureOffset(perlinNoise, texCoord, ivec2(-1, 0)).x;
-  float right = textureOffset(perlinNoise, texCoord, ivec2(1, 0)).x;
-  float down = textureOffset(perlinNoise, texCoord, ivec2(0, -1)).x;
-  float up = textureOffset(perlinNoise, texCoord, ivec2(0, 1)).x;
-  return normalize(vec3(left - right, 2.0, down - up));
+vec3 calcNorm(vec2 texCoord)
+{
+  const float pixSize = GridSize[0];
+  float left = texture(perlinNoise, texCoord - vec2(-1, 0) * pixSize).x * zScale;
+  float right = texture(perlinNoise, texCoord + vec2(-1, 0) * pixSize).x * zScale;
+  float up = texture(perlinNoise, texCoord - vec2(0, -1) * pixSize).x * zScale;
+  float down = texture(perlinNoise, texCoord + vec2(0, -1) * pixSize).x * zScale;
+
+  return normalize(vec3(right - left, 2.0 * pixSize, up - down));
 }
 
 void main()
 {
-  wPos = mix(WorldPos_ES_in[0], WorldPos_ES_in[1], vec3(gl_TessCoord.xy, 0).xzy);
+  wPos.y = WorldPos_ES_in[0].y;
+  wPos.xz = mix(WorldPos_ES_in[0].xz, WorldPos_ES_in[1].xz, gl_TessCoord.xy);
   texCoord = mix(TexCoord_ES_in[0], TexCoord_ES_in[1], gl_TessCoord.xy);
   wPos.y += texture(perlinNoise, texCoord).x * zScale;
   wTangent = vec3(0, 0, 1);

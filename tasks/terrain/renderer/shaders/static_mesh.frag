@@ -15,7 +15,7 @@ layout(location = 0) in VS_OUT
 
 void main()
 {
-  const vec3 wLightPos = vec3(10, 10, 10);
+  const vec3 wLightPos = vec3(0, 10, 0);
   const vec3 surfaceColor = vec3(1.0f, 1.0f, 1.0f);
   const vec3 lightColor = vec3(1.0f, 1.0f, 1.0f);
 

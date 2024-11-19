@@ -320,5 +320,5 @@ void WorldRenderer::renderTerrain(vk::CommandBuffer cmd_buf)
     0,
     {TerrainPushConst{worldViewProj, eye}});
 
-  cmd_buf.draw(3, (4096 * 4096) / (16 * 16), 0, 0);
+  cmd_buf.draw(3, (4096 * 4096) / (128 * 128), 0, 0);
 }
