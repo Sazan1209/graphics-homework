@@ -267,7 +267,7 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
     cmd_buf,
     perlinTex.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderWrite,
+    vk::AccessFlagBits2::eShaderStorageWrite,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
 
@@ -297,6 +297,8 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
       0,
       nullptr);
 
+
+    etna::flush_barriers(cmd_buf);
     cmd_buf.dispatch(4096 / 32, 4096 / 32, 1);
   }
 
@@ -304,15 +306,16 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
     cmd_buf,
     perlinTex.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderRead,
+    vk::AccessFlagBits2::eShaderStorageRead,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
+  etna::flush_barriers(cmd_buf);
 
   etna::set_state(
     cmd_buf,
     normalMap.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderWrite,
+    vk::AccessFlagBits2::eShaderStorageWrite,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
   etna::flush_barriers(cmd_buf);
@@ -342,6 +345,7 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
       0,
       nullptr);
 
+    etna::flush_barriers(cmd_buf);
     cmd_buf.dispatch(4096 / 32, 4096 / 32, 1);
   }
 
