@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(quads, equal_spacing, cw) in;
+layout(quads, fractional_even_spacing, cw) in;
 
 layout(binding = 0) uniform sampler2D perlinNoise;
 layout(push_constant) uniform params_t

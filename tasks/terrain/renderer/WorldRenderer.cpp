@@ -46,7 +46,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 
   normalMap = ctx.createImage(etna::Image::CreateInfo{
     .extent = vk::Extent3D{4096, 4096, 1},
-    .name = "perlin_noise",
+    .name = "normal_map",
     .format = vk::Format::eR8G8B8A8Snorm,
     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
 
@@ -263,20 +263,20 @@ void WorldRenderer::renderWorld(
 
 void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
 {
-  etna::set_state(
-    cmd_buf,
-    perlinTex.get(),
-    vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderStorageWrite,
-    vk::ImageLayout::eGeneral,
-    vk::ImageAspectFlagBits::eColor);
-
-  etna::flush_barriers(cmd_buf);
 
   {
     auto perlinInfo = etna::get_shader_program("perlin");
 
     auto binding = perlinTex.genBinding(perlinSampler.get(), vk::ImageLayout::eGeneral, {});
+
+    // create desc set calls
+    // etna::set_state(
+    //   cmd_buf,
+    //   perlinTex.get(),
+    //   vk::PipelineStageFlagBits2::eComputeShader,
+    //   vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageWrite,
+    //   vk::ImageLayout::eGeneral,
+    //   vk::ImageAspectFlagBits::eColor);
 
     auto set = etna::create_descriptor_set(
       perlinInfo.getDescriptorLayoutId(0),
@@ -302,28 +302,37 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
     cmd_buf.dispatch(4096 / 32, 4096 / 32, 1);
   }
 
-  etna::set_state(
-    cmd_buf,
-    perlinTex.get(),
-    vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderStorageRead,
-    vk::ImageLayout::eGeneral,
-    vk::ImageAspectFlagBits::eColor);
-  etna::flush_barriers(cmd_buf);
-
-  etna::set_state(
-    cmd_buf,
-    normalMap.get(),
-    vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderStorageWrite,
-    vk::ImageLayout::eGeneral,
-    vk::ImageAspectFlagBits::eColor);
-  etna::flush_barriers(cmd_buf);
-
   {
     auto normalInfo = etna::get_shader_program("normal");
     auto binding0 = perlinTex.genBinding(perlinSampler.get(), vk::ImageLayout::eGeneral, {});
     auto binding1 = normalMap.genBinding(perlinSampler.get(), vk::ImageLayout::eGeneral, {});
+
+    // Create descriptorSet will call
+    // etna::set_state(
+    //   cmd_buf,
+    //   perlinTex.get(),
+    //   vk::PipelineStageFlagBits2::eComputeShader,
+    //   vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite,
+    //   vk::ImageLayout::eGeneral,
+    //   vk::ImageAspectFlagBits::eColor);
+
+    // etna::set_state(
+    //   cmd_buf,
+    //   normalMap.get(),
+    //   vk::PipelineStageFlagBits2::eComputeShader,
+    //   vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite,
+    //   vk::ImageLayout::eGeneral,
+    //   vk::ImageAspectFlagBits::eColor);
+
+    // the perlinTex barrier is dropped, so we call the following even though it's superfluous
+
+    etna::set_state(
+      cmd_buf,
+      perlinTex.get(),
+      vk::PipelineStageFlagBits2::eComputeShader,
+      vk::AccessFlagBits2::eShaderStorageRead,
+      vk::ImageLayout::eGeneral,
+      vk::ImageAspectFlagBits::eColor);
 
     auto set = etna::create_descriptor_set(
       normalInfo.getDescriptorLayoutId(0),
@@ -373,6 +382,7 @@ void WorldRenderer::renderTerrain(vk::CommandBuffer cmd_buf)
   auto info = etna::get_shader_program("terrain_render");
   auto bind0 = perlinTex.genBinding(perlinSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
   auto bind1 = normalMap.genBinding(perlinSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
+
   auto descSet = etna::create_descriptor_set(
     info.getDescriptorLayoutId(0), cmd_buf, {etna::Binding{0, bind0}, etna::Binding{1, bind1}});
   auto vkSet = descSet.getVkSet();
@@ -388,5 +398,6 @@ void WorldRenderer::renderTerrain(vk::CommandBuffer cmd_buf)
     0,
     {TerrainPushConst{worldViewProj, eye}});
 
+  // etna::flush_barriers(cmd_buf);
   cmd_buf.draw(3, (4096 * 4096) / (128 * 128), 0, 0);
 }
