@@ -1,0 +1,52 @@
+#version 430
+
+layout(local_size_x = 32, local_size_y = 32) in;
+
+const uint bucketCount = 128;
+const float minLum = 0.0001 * 255;
+const float minB = log(minLum);
+const float maxLum = 1.2;
+const float maxB = log(maxLum);
+const float dB = (maxB - minB) / bucketCount;
+const vec3 lumVec = vec3(0.2126, 0.7152, 0.0722);
+
+// needed to decrease the amount of between group syncing
+shared uint localBuckets[bucketCount];
+
+layout(binding = 0, r11f_g11f_b10f) restrict readonly uniform image2D image;
+layout(binding = 1, std430) buffer A
+{
+  uint outputBuf[128];
+};
+
+uint bucketFromLum(float lum)
+{
+  lum = clamp(lum, minLum, maxLum);
+  const float b = log(lum);
+  return uint(floor((b - minB - 0.00001) / dB));
+}
+
+void main()
+{
+  const uvec2 size = imageSize(image);
+  if (size.x <= gl_GlobalInvocationID.x || size.y <= gl_GlobalInvocationID.y)
+  {
+    return;
+  }
+  const uint ind = gl_LocalInvocationIndex;
+  if (ind < bucketCount)
+  {
+    localBuckets[ind] = 0;
+  }
+  barrier();
+  const vec3 pixel = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).xyz;
+  const float lum = dot(pixel, lumVec);
+
+  atomicAdd(localBuckets[bucketFromLum(lum)], 1);
+  barrier();
+  memoryBarrierShared();
+  if (ind < bucketCount)
+  {
+    atomicAdd(outputBuf[ind], localBuckets[ind]);
+  }
+}

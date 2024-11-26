@@ -1,0 +1,48 @@
+#version 430
+
+
+layout(local_size_x = 256) in;
+
+layout(binding = 0, std430) restrict buffer A
+{
+  uint buf[256];
+};
+/*
+shared uint total;
+shared uint trimmings;
+shared uint flag;*/
+
+// not the most efficient solution, but one of the easiest
+void main()
+{
+  const uint ind = gl_LocalInvocationIndex;
+  /*if (ind == 0){
+    total = 0;
+    trimmings = 0;
+    flag = 1;
+  }
+  barrier();
+  sharedMemoryBarrier();
+
+  atomicAdd(total, buf[ind]);
+  barrier();
+
+  atomicAnd(flag, buf[ind] <= total / 128);
+  uint localTotal = total;
+  uint localTrimmings = trimmings;
+  barrier();
+  sharedMemoryBarrier();
+  if (flag == 0){
+    for (uint i = 0; i < 5; ++i){
+
+    }
+  }*/
+
+  uint res = 0;
+  for (uint i = 0; i < ind; ++i)
+  {
+    res += buf[i];
+  }
+  barrier();
+  buf[ind] += res;
+}

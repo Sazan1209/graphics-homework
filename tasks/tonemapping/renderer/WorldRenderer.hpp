@@ -35,6 +35,7 @@ private:
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
   void createTerrainMap(vk::CommandBuffer cmd_buf);
   void renderTerrain(vk::CommandBuffer cmd_buf);
+  void tonemap(vk::CommandBuffer cmd_buf);
 
   bool shouldCull(glm::mat4 mModel, BoundingBox box);
 
@@ -45,6 +46,7 @@ private:
   etna::Image mainView;
   etna::Image perlinTex;
   etna::Image normalMap;
+  etna::Buffer tonemapHist;
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
   glm::mat4x4 worldViewProj;
@@ -57,6 +59,9 @@ private:
   etna::ComputePipeline perlinPipeline{};
   etna::ComputePipeline normalPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
+  etna::ComputePipeline tonemapHistPipeline{};
+  etna::ComputePipeline tonemapCumsumPipeline{};
+  etna::ComputePipeline tonemapPipeline{};
 
   struct TerrainPushConst
   {
