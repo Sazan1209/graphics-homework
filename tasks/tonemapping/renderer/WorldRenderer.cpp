@@ -5,6 +5,7 @@
 #include <etna/RenderTargetStates.hpp>
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
+#include "shaders/tonemap.h"
 
 WorldRenderer::WorldRenderer(const etna::GpuWorkCount& workCount)
   : sceneMgr{std::make_unique<SceneManager>()}
@@ -58,7 +59,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
 
   tonemapHist = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = 256 * 4,
+    .size = tonemap_const::bucketCount * 4,
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
     .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
     .name = "tonemap_hist"});

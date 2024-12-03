@@ -8,6 +8,10 @@
 
 #include <glm/glm.hpp>
 
+#define SHADER_NAMESPACE(name)\
+namespace name {
+
+#define SHADER_NAMESPACE_END }
 
 // NOLINTBEGIN
 
@@ -32,6 +36,10 @@ using shader_bool = glm::uint;
 
 #else
 
+#define SHADER_NAMESPACE(name)
+#define SHADER_NAMESPACE_END
+
+
 #define shader_uint uint
 #define shader_uvec2 uvec2
 
@@ -45,6 +53,7 @@ using shader_bool = glm::uint;
 #define shader_bool bool
 
 #endif
+
 
 // NOLINTEND
 
