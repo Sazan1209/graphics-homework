@@ -1,12 +1,14 @@
 #version 430
 #extension GL_GOOGLE_include_directive : require
 
-#include "tonemap.h"
+#include "tonemap.glsl"
 
 layout(local_size_x = BUCKET_COUNT) in;
 
-layout(binding = 0, std430) restrict buffer A
+layout(binding = 0, std430) buffer A
 {
+  float minLum;
+  float maxLum;
   uint buf[bucketCount];
 };
 
