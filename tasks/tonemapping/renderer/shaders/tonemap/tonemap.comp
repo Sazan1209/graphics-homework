@@ -30,12 +30,23 @@ void main()
   {
     return;
   }
+
   vec3 pixel = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).xyz;
 
   const float lum = dot(pixel, lumVec);
-  const uint ind = bucketFromLum(lum);
-  const float distr = float(cumDist[ind]) / float(size.x * size.y);
-  const float resB = minScreenB + (maxScreenB - minScreenB) * distr;
-  pixel = pixel * exp(resB) / lum;
+  // linear interpolation
+  if (maxLum / minLum <= maxScreenLum / minScreenLum)
+  {
+    const float coef = (lum - minLum) / (maxLum - minLum);
+    const float resLum = mix(coef, maxScreenLum, minScreenLum);
+    pixel = (pixel / lum) * resLum;
+  }
+  else
+  {
+    const uint ind = bucketFromLum(lum);
+    const float distr = float(cumDist[ind]) / float(cumDist[bucketCount - 1]);
+    const float resB = minScreenB + (maxScreenB - minScreenB) * distr;
+    pixel = pixel * exp(resB) / lum;
+  }
   imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
 }

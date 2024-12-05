@@ -1,8 +1,8 @@
 #include "tonemap.h"
 
-const float minEyeLum = 0.0001 * 255;
+const float minEyeLum = 0.0001;
 
-const float minScreenLum = minEyeLum;
+const float minScreenLum = 1.0 / 255.0;
 const float minScreenB = log(minScreenLum);
 const float maxScreenLum = 1.0;
 const float maxScreenB = log(maxScreenLum);

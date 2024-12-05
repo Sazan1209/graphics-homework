@@ -59,6 +59,8 @@ private:
   etna::ComputePipeline perlinPipeline{};
   etna::ComputePipeline normalPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
+  etna::ComputePipeline tonemapMinmaxPipeline{};
+  etna::ComputePipeline tonemapEqualizePipeline{};
   etna::ComputePipeline tonemapHistPipeline{};
   etna::ComputePipeline tonemapCumsumPipeline{};
   etna::ComputePipeline tonemapPipeline{};

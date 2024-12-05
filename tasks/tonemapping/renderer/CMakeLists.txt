@@ -19,7 +19,9 @@ target_add_shaders(tonemapping_renderer
   shaders/normal.comp
   shaders/terrain.frag
 
-  shaders/hist.comp
-  shaders/cumsum.comp
-  shaders/tonemap.comp
+  shaders/tonemap/minmax.comp
+  shaders/tonemap/equalize.comp
+  shaders/tonemap/hist.comp
+  shaders/tonemap/cumsum.comp
+  shaders/tonemap/tonemap.comp
 )

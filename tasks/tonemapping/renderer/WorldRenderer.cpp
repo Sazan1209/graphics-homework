@@ -5,7 +5,7 @@
 #include <etna/RenderTargetStates.hpp>
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
-#include "shaders/tonemap.h"
+#include "shaders/tonemap/tonemap.h"
 
 WorldRenderer::WorldRenderer(const etna::GpuWorkCount& workCount)
   : sceneMgr{std::make_unique<SceneManager>()}
@@ -59,7 +59,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
 
   tonemapHist = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = tonemap_const::bucketCount * 4,
+    .size = (tonemap_const::bucketCount + 2) * 4,
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
     .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
     .name = "tonemap_hist"});
@@ -92,6 +92,8 @@ void WorldRenderer::loadShaders()
      TONEMAPPING_RENDERER_SHADERS_ROOT "terrain.tesc.spv",
      TONEMAPPING_RENDERER_SHADERS_ROOT "terrain.tese.spv",
      TONEMAPPING_RENDERER_SHADERS_ROOT "terrain.frag.spv"});
+  etna::create_program("tonemap_minmax", {TONEMAPPING_RENDERER_SHADERS_ROOT "minmax.comp.spv"});
+  etna::create_program("tonemap_equalize", {TONEMAPPING_RENDERER_SHADERS_ROOT "equalize.comp.spv"});
   etna::create_program("tonemap_hist", {TONEMAPPING_RENDERER_SHADERS_ROOT "hist.comp.spv"});
   etna::create_program("tonemap_cumsum", {TONEMAPPING_RENDERER_SHADERS_ROOT "cumsum.comp.spv"});
   etna::create_program("tonemap", {TONEMAPPING_RENDERER_SHADERS_ROOT "tonemap.comp.spv"});
@@ -145,6 +147,8 @@ void WorldRenderer::setupPipelines()
         },
     });
 
+  tonemapMinmaxPipeline = pipelineManager.createComputePipeline("tonemap_minmax", {});
+  tonemapEqualizePipeline = pipelineManager.createComputePipeline("tonemap_equalize", {});
   tonemapHistPipeline = pipelineManager.createComputePipeline("tonemap_hist", {});
   tonemapCumsumPipeline = pipelineManager.createComputePipeline("tonemap_cumsum", {});
   tonemapPipeline = pipelineManager.createComputePipeline("tonemap", {});
@@ -295,6 +299,48 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     cmd_buf.pipelineBarrier2(depInfo);
   }
 
+  {
+    auto minmaxInfo = etna::get_shader_program("tonemap_minmax");
+    auto binding0 = mainView.genBinding({}, vk::ImageLayout::eGeneral, {});
+    auto binding1 = tonemapHist.genBinding();
+    auto set = etna::create_descriptor_set(
+      minmaxInfo.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, binding0},
+        etna::Binding{1, binding1},
+      });
+    vk::DescriptorSet vkSet = set.getVkSet();
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, tonemapMinmaxPipeline.getVkPipeline());
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eCompute,
+      tonemapMinmaxPipeline.getVkPipelineLayout(),
+      0,
+      1,
+      &vkSet,
+      0,
+      nullptr);
+    etna::flush_barriers(cmd_buf);
+    cmd_buf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
+  }
+
+  {
+    vk::BufferMemoryBarrier2 barrierBuf = {
+      .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+      .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .dstAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .buffer = tonemapHist.get(),
+      .offset = 0,
+      .size = VK_WHOLE_SIZE};
+
+    depInfo.bufferMemoryBarrierCount = 1;
+    depInfo.pBufferMemoryBarriers = &barrierBuf;
+
+    cmd_buf.pipelineBarrier2(depInfo);
+  }
 
   {
     auto histInfo = etna::get_shader_program("tonemap_hist");
@@ -319,6 +365,47 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
       nullptr);
     etna::flush_barriers(cmd_buf);
     cmd_buf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
+  }
+
+  {
+    vk::BufferMemoryBarrier2 barrierBuf = {
+      .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+      .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .dstAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .buffer = tonemapHist.get(),
+      .offset = 0,
+      .size = VK_WHOLE_SIZE};
+
+    depInfo.bufferMemoryBarrierCount = 1;
+    depInfo.pBufferMemoryBarriers = &barrierBuf;
+
+    cmd_buf.pipelineBarrier2(depInfo);
+  }
+
+  {
+    auto info = etna::get_shader_program("tonemap_equalize");
+    auto binding0 = tonemapHist.genBinding();
+    auto set = etna::create_descriptor_set(
+      info.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, binding0},
+      });
+    vk::DescriptorSet vkSet = set.getVkSet();
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, tonemapEqualizePipeline.getVkPipeline());
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eCompute,
+      tonemapEqualizePipeline.getVkPipelineLayout(),
+      0,
+      1,
+      &vkSet,
+      0,
+      nullptr);
+    etna::flush_barriers(cmd_buf);
+    cmd_buf.dispatch(tonemap_const::bucketCount, 1, 1);
   }
 
   {

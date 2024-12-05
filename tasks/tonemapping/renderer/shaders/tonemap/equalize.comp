@@ -1,0 +1,66 @@
+#version 430
+#extension GL_GOOGLE_include_directive : require
+
+#include "tonemap.glsl"
+
+layout(local_size_x = BUCKET_COUNT) in;
+
+layout(binding = 0, std430) buffer A
+{
+  float minLum;
+  float maxLum;
+  uint buf[bucketCount];
+};
+
+shared uint total;
+shared uint trim;
+
+void main()
+{
+  if (maxLum / minLum <= maxScreenLum / minScreenLum)
+  {
+    return;
+  }
+  const float dB = (log(maxLum) - log(minLum)) / bucketCount;
+  const float coef = dB / (maxScreenB - minScreenB);
+  const uint ind = gl_LocalInvocationIndex;
+  if (ind == 0)
+  {
+    total = 0;
+  }
+
+  barrier();
+  memoryBarrierShared();
+
+  atomicAdd(total, buf[ind]);
+
+  barrier();
+  memoryBarrierShared();
+
+  const uint tolerance = uint((2.5 / 100.0) * total);
+
+  do
+  {
+    barrier();
+
+    if (ind == 0)
+    {
+      trim = 0;
+    }
+    const uint ceiling = uint(total * coef);
+
+    barrier();
+    memoryBarrierShared();
+
+    if (ceiling < buf[ind])
+    {
+      atomicAdd(trim, buf[ind] - ceiling);
+      atomicAdd(total, ceiling - buf[ind]);
+      buf[ind] = ceiling;
+    }
+
+    barrier();
+    memoryBarrierShared();
+
+  } while (trim > tolerance);
+}
