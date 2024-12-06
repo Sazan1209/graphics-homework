@@ -30,12 +30,10 @@ void main()
   }
 
   barrier();
-  memoryBarrierShared();
 
   atomicAdd(total, buf[ind]);
 
   barrier();
-  memoryBarrierShared();
 
   const uint tolerance = uint((2.5 / 100.0) * total);
 
@@ -50,7 +48,6 @@ void main()
     const uint ceiling = uint(total * coef);
 
     barrier();
-    memoryBarrierShared();
 
     if (ceiling < buf[ind])
     {
@@ -60,7 +57,6 @@ void main()
     }
 
     barrier();
-    memoryBarrierShared();
 
   } while (trim > tolerance);
 }

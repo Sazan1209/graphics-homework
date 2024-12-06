@@ -22,7 +22,7 @@ void main()
 {
   const vec3 wLightPos = vec3(0, 10, 0);
   const vec3 surfaceColor = vec3(1.0f, 1.0f, 1.0f);
-  const vec3 lightColor = vec3(1.0f, 1.0f, 1.0f);
+  const vec3 lightColor = vec3(10.0f, 10.0f, 10.0f);
   const vec3 wNorm = texture(normalMap, surf.texCoord).xyz;
   const vec3 diff = wLightPos - surf.wPos;
   const float dist = length(diff);

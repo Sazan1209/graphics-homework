@@ -405,7 +405,7 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
       0,
       nullptr);
     etna::flush_barriers(cmd_buf);
-    cmd_buf.dispatch(tonemap_const::bucketCount, 1, 1);
+    cmd_buf.dispatch(1, 1, 1);
   }
 
   {
