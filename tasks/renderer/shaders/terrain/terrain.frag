@@ -17,16 +17,21 @@ surf;
 const float constant = 1.0;
 const float linear = 0.0014;
 const float quadratic = 0.000007;
-const float ambient = 0.05;
+const float ambient = 0.5;
+
+const vec3 grass = vec3(72, 140, 49) / 255.0;
+const vec3 dirt = vec3(136, 102, 59) / 255.0;
+const float degree = 0.6;
 
 void main()
 {
   const vec3 wLightPos = vec3(0, 10, 0);
-  const vec3 surfaceColor = vec3(1.0f, 1.0f, 1.0f);
-
 
   const vec3 lightColor = vec3(10.0f, 10.0f, 10.0f);
   const vec3 wNorm = texture(normalMap, surf.texCoord).xyz;
+
+  const vec3 surfaceColor = wNorm.y >= degree ? grass : dirt;
+
   const vec3 diff = wLightPos - surf.wPos;
   const float dist = length(diff);
 

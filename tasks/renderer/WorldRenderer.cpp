@@ -575,7 +575,6 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
 
   etna::flush_barriers(cmd_buf);
 
-
   std::array offsets = {
     vk::Offset3D{},
     vk::Offset3D{static_cast<int32_t>(resolution.x), static_cast<int32_t>(resolution.y), 1}};
