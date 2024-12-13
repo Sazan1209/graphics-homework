@@ -60,24 +60,28 @@ bool Seen(vec3 point)
 
 bool Cull(vec3 minP, vec3 maxP)
 {
-  for (uint mask = 0; mask < 8u; ++mask)
+
+  vec3 minV;
+  vec3 maxV;
   {
-    vec3 corner;
+    vec4 proj = mProjView * vec4(minP, 1);
+    proj /= abs(proj.w);
+    minV = proj.xyz;
+    maxV = proj.xyz;
+  }
+  for (uint mask = 1; mask < 8u; ++mask)
+  {
+    vec3 point;
     for (uint i = 0; i < 3; ++i)
     {
-      corner[i] = ((mask & (1u << i)) > 0) ? maxP[i] : minP[i];
+      point[i] = ((mask & (1u << i)) > 0) ? maxP[i] : minP[i];
     }
-    if (Seen(corner))
-    {
-      return false;
-    }
+    vec4 corner = mProjView * vec4(point, 1);
+    corner /= abs(corner.w);
+    minV = min(minV, corner.xyz);
+    maxV = max(maxV, corner.xyz);
   }
-  vec3 center = (maxP + minP) / 2.0;
-  if (Seen(center))
-  {
-    return false;
-  }
-  return true;
+  return any(lessThan(maxV, vec3(-1, -1, 0))) || any(greaterThan(minV, vec3(1, 1, 1)));
 }
 
 void main()

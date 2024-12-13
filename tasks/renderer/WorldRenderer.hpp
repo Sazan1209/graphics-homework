@@ -53,6 +53,7 @@ private:
   glm::vec3 eye;
   glm::mat4x4 lightMatrix;
   float nearPlane;
+  glm::mat4x4 worldViewProj;
   float farPlane;
 
   etna::GraphicsPipeline staticMeshPipeline{};
