@@ -13,16 +13,6 @@ layout(binding = 1, std430) buffer A
   uint cumDist[bucketCount];
 };
 
-uint bucketFromLum(float lum)
-{
-  float minB = log(minLum);
-  float maxB = log(maxLum);
-  float dB = (maxB - minB) / bucketCount;
-
-  const float b = log(lum);
-  return min(uint(floor((b - minB) / dB)), bucketCount - 1);
-}
-
 void main()
 {
   const ivec2 size = imageSize(image);
@@ -38,15 +28,27 @@ void main()
   if (maxLum / minLum <= maxScreenLum / minScreenLum)
   {
     const float coef = (lum - minLum) / (maxLum - minLum);
-    const float resLum = mix(coef, maxScreenLum, minScreenLum);
+    const float resLum = mix(minScreenLum, maxScreenLum, coef);
     pixel = (pixel / lum) * resLum;
   }
   else
   {
-    const uint ind = bucketFromLum(lum);
-    const float distr = float(cumDist[ind]) / float(cumDist[bucketCount - 1]);
-    const float resB = minScreenB + (maxScreenB - minScreenB) * distr;
+    const float minB = log(minLum);
+    const float maxB = log(maxLum);
+    const float dB = (maxB - minB) / bucketCount;
+    const float b = log(lum);
+    const uint ind = min(uint(floor((b - minB) / dB)), bucketCount - 1);
+
+    const float total = cumDist[bucketCount - 1];
+    const float distrPrev = ind == 0 ? 0.0 : float(cumDist[ind - 1]) / total;
+    const float distr = float(cumDist[ind]) / total;
+
+    const float coef = (b - minB - float(ind) * dB) / dB;
+    const float diff = mix(distrPrev, distr, coef);
+
+    const float resB = mix(minScreenB, maxScreenB, diff);
     pixel = pixel * exp(resB) / lum;
   }
+  pixel = pow(pixel, vec3(2.2));
   imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
 }

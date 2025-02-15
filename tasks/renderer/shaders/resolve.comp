@@ -1,0 +1,83 @@
+#include "resolve.h"
+
+layout(local_size_x = 32, local_size_y = 32) in;
+
+layout(binding = 0, r11f_g11f_b10f) restrict uniform image2D albedo;
+layout(binding = 1, r32f) restrict readonly uniform image2D depth;
+layout(binding = 2, r11f_g11f_b10f) restrict readonly uniform image2D normal;
+
+layout(push_constant) uniform struct
+{
+  mat4 mView;
+  float near;
+  float far;
+  float tanFov;
+};
+
+struct PointLight
+{
+  vec3 color;
+  float strength;
+  vec3 pos;
+  float padding;
+};
+
+struct Sunlight
+{
+  vec3 dir;
+  float strength;
+  vec3 color;
+  float ambient;
+};
+
+layout(binding = 3, std430) buffer struct
+{
+  Sunlight sunlight;
+  PointLight lights[];
+};
+
+void main()
+{
+  ivec2 resolution = imageSize(albedo);
+  if (any(greaterThan(gl_GlobalInvocationID.xy, resolution));
+  {
+    return;
+  }
+
+  float aspect = float(resolution.x) / float(resolution.y);
+
+  vec3 pos;
+
+  vec2 fragCoord = vec2(gl_GlobalInvocationID.xy) / vec2(resolution) - 0.5;
+  pos.z = imageLoad(depth, ivec2(gl_GlobalInvocationID.xy) * (far - near) + near;
+  pos.y = tanFov * pos.z * fragCoord.y;
+  pos.x = tanFov * pos.z * aspect * fragCoord.x;
+
+  vec3 normal = mat3(mView) * imageLoad(normal, ivec2(gl_GlobalInvocationID.xy)).xyz;
+  vec3 pixel = imageLoad(albedo, ivec2(gl_GlobalInvocationID.xy)).rgb;
+
+  vec3 light;
+
+  vec3 eyeDir = normalize(-pos);
+
+  for (int i = 0; i < lights.length(); ++i){
+    vec3 lightPos = mView * vec4(lights[i].pos, 1.0);
+    float lightDist = distance(pos, lightPos);
+    vec3 lightDir = (pos - lightPos) / lightDist;
+    float attenuation = 1.0 / (1.0 + attenuationCoef * lightDist * lightDist);
+
+    float diffuse = max(0.0, dot(normal, lightDir));
+    float specular = pow(max(0.0, dot(eyeDir, reflect(-lightDir, normal))), lightExponent);
+    light += lights[i].color * lights[i].strength * (diffuse + specular) * attenuation;
+  }
+
+  {
+    vec3 lightDir = mat3(mView) * sunlight.dir;
+
+    float diffuse = max(0.0, dot(normal, lightDir));
+    float specular = pow(max(0.0, dot(eyeDir, reflect(-lightDir, normal))), lightExponent);
+    light += sunlight.color * sunlight.strength * (diffuse + specular + sunlight.ambient);
+  }
+
+  imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
+}

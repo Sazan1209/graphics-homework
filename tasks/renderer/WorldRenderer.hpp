@@ -42,16 +42,20 @@ private:
 private:
   std::unique_ptr<SceneManager> sceneMgr;
 
-  etna::Image mainViewDepth;
-  etna::Image mainView;
   etna::Image perlinTex;
   etna::Image normalMap;
+
+  struct {
+    etna::Image color;
+    etna::Image normal;
+    etna::Image depthStencil;
+  } gBuffer;
+
   etna::Buffer tonemapHist;
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
   glm::mat4x4 worldViewProj;
   glm::vec3 eye;
-  glm::mat4x4 lightMatrix;
   float nearPlane;
   float farPlane;
 

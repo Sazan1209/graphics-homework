@@ -4,6 +4,8 @@
 
 
 layout(location = 0) out vec4 out_fragColor;
+
+
 layout(binding = 1) uniform sampler2D normalMap;
 
 
