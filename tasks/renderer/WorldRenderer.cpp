@@ -293,9 +293,11 @@ void WorldRenderer::update(const FramePacket& packet)
   // calc camera matrix
   {
     const float aspect = float(resolution.x) / float(resolution.y);
+    worldView = packet.mainCam.viewTm();
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
     nearPlane = packet.mainCam.zNear;
     farPlane = packet.mainCam.zFar;
+    tanFov = glm::tan(packet.mainCam.fov);
     eye = packet.mainCam.position;
   }
 }
@@ -506,6 +508,11 @@ void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
     &vkSet,
     0,
     nullptr);
+  cmd_buf.pushConstants<ResolvePushConstant>(
+    resolvePipeline.getVkPipelineLayout(),
+    vk::ShaderStageFlagBits::eCompute,
+    0,
+    ResolvePushConstant{.mView = worldView, .near = nearPlane, .far = farPlane, .tanFov = tanFov});
   etna::flush_barriers(cmd_buf);
   cmd_buf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
 }

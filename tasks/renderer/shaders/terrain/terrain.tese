@@ -39,7 +39,7 @@ void main()
   vec3 wPos;
   wPos.y = WorldPos_ES_in[0].y;
   wPos.xz = mix(WorldPos_ES_in[0].xz, WorldPos_ES_in[1].xz, gl_TessCoord.xy);
-  wPos.y += texture(perlinNoise, out_texCoord).x * zScale;
   out_texCoord = mix(TexCoord_ES_in[0], TexCoord_ES_in[1], gl_TessCoord.xy);
+  wPos.y += texture(perlinNoise, out_texCoord).x * zScale;
   gl_Position = mProjView * vec4(wPos, 1.0);
 }

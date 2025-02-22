@@ -57,9 +57,11 @@ private:
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
   glm::mat4x4 worldViewProj;
+  glm::mat4 worldView;
   glm::vec3 eye;
   float nearPlane;
   float farPlane;
+  float tanFov;
 
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::ComputePipeline perlinPipeline{};
@@ -76,6 +78,13 @@ private:
   {
     glm::mat4 proj;
     glm::vec3 eye;
+  };
+
+  struct ResolvePushConstant{
+    glm::mat4 mView;
+    float near;
+    float far;
+    float tanFov;
   };
 
   etna::Sampler perlinSampler;
