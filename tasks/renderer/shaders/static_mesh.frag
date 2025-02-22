@@ -12,13 +12,13 @@ layout(location = 0) in in_vs_out
   vec3 wNorm;
   vec3 wTangent;
   vec2 texCoord;
-} surf;
+};
 
 void main()
 {
   const vec3 surfaceColor = vec3(1.0f, 1.0f, 1.0f);
 
-  out_fragColor.rgb = surfaceColor;
-  out_fragColor.a = 1.0f;
-  out_normal.xyz = in_vs_out.wNorm;
+  out_color.rgb = surfaceColor;
+  out_color.a = 1.0f;
+  out_normal.xyz = wNorm;
 }

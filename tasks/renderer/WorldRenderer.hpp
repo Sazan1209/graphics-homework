@@ -36,14 +36,16 @@ private:
   void createTerrainMap(vk::CommandBuffer cmd_buf);
   void renderTerrain(vk::CommandBuffer cmd_buf);
   void tonemap(vk::CommandBuffer cmd_buf);
+  void resolve(vk::CommandBuffer cmd_buf);
 
   bool shouldCull(glm::mat4 mModel, BoundingBox box);
 
 private:
   std::unique_ptr<SceneManager> sceneMgr;
 
-  etna::Image perlinTex;
+  etna::Image heightMap;
   etna::Image normalMap;
+  etna::Buffer lightList;
 
   struct {
     etna::Image color;
@@ -68,6 +70,7 @@ private:
   etna::ComputePipeline tonemapHistPipeline{};
   etna::ComputePipeline tonemapCumsumPipeline{};
   etna::ComputePipeline tonemapPipeline{};
+  etna::ComputePipeline resolvePipeline{};
 
   struct TerrainPushConst
   {

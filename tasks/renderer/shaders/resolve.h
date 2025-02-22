@@ -8,11 +8,20 @@ SHADER_NAMESPACE(resolve)
 const shader_float lightExponent = 5.0;
 const shader_float attenuationCoef = 0.2;
 
-struct PointLight{
+struct PointLight
+{
   shader_vec3 color;
   shader_float strength;
   shader_vec3 pos;
   shader_float padding;
+};
+
+struct Sunlight
+{
+  shader_vec3 dir;
+  shader_float strength;
+  shader_vec3 color;
+  shader_float ambient;
 };
 
 SHADER_NAMESPACE_END

@@ -8,9 +8,7 @@
 
 #include <glm/glm.hpp>
 
-#define SHADER_NAMESPACE(name)\
-namespace name {
-
+#define SHADER_NAMESPACE(name) namespace name {
 #define SHADER_NAMESPACE_END }
 
 // NOLINTBEGIN

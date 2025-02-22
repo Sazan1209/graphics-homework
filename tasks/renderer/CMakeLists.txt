@@ -12,6 +12,7 @@ target_link_libraries(complete_renderer
 target_add_shaders(complete_renderer
   shaders/static_mesh.frag
   shaders/static_mesh.vert
+  shaders/resolve.comp
 
   shaders/terrain/perlin.comp
   shaders/terrain/normal.comp
