@@ -41,7 +41,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
   gBuffer.normal = ctx.createImage(etna::Image::CreateInfo{
     .extent = vk::Extent3D{resolution.x, resolution.y, 1},
     .name = "gBuffer.normal",
-    .format = vk::Format::eB10G11R11UfloatPack32,
+    .format = vk::Format::eA8B8G8R8SnormPack32,
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eStorage});
 
   modelMatrices.iterate([&](auto& buf) {
@@ -275,7 +275,7 @@ void WorldRenderer::setupPipelines()
         .fragmentShaderOutput =
           {
             .colorAttachmentFormats =
-              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eB10G11R11UfloatPack32},
+              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eA8B8G8R8SnormPack32},
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
@@ -307,7 +307,7 @@ void WorldRenderer::setupPipelines()
         .fragmentShaderOutput =
           {
             .colorAttachmentFormats =
-              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eB10G11R11UfloatPack32},
+              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eA8B8G8R8SnormPack32},
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
@@ -343,7 +343,7 @@ void WorldRenderer::setupPipelines()
         .fragmentShaderOutput =
           {
             .colorAttachmentFormats =
-              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eB10G11R11UfloatPack32},
+              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eA8B8G8R8SnormPack32},
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
@@ -415,7 +415,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, staticMeshPipeline.getVkPipeline());
     renderScene(cmd_buf, worldViewProj, staticMeshPipeline.getVkPipelineLayout());
     renderTerrain(cmd_buf);
-    // renderCube(cmd_buf);
+    renderCube(cmd_buf);
   }
 
   resolve(cmd_buf);

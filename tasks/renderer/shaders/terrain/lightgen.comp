@@ -39,5 +39,5 @@ void main()
   posWorld.z = -posWorld.z;
   posWorld += centerCoordWorld;
 
-  lights[ind] = PointLight(vec3(rand(1), rand(2), rand(3)), 20.0 + 5.0, posWorld, 0.0);
+  lights[ind] = PointLight(vec3(rand(1), rand(2), rand(3)), 15.0, posWorld, 0.0);
 }

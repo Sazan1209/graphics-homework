@@ -2,13 +2,13 @@
 #extension GL_GOOGLE_include_directive : require
 
 
-#include "resolve.h"
+#include "resolve.glsl"
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(binding = 0, r11f_g11f_b10f) restrict uniform image2D albedo;
 layout(binding = 1, r32f) restrict readonly uniform image2D depths;
-layout(binding = 2, r11f_g11f_b10f) restrict uniform image2D normals;
+layout(binding = 2, rgba8) restrict uniform image2D normals;
 
 layout(push_constant) uniform pc
 {
@@ -43,10 +43,10 @@ void main()
   vec3 pos;
 
   vec2 fragCoord = vec2(gl_GlobalInvocationID.xy) * 2.0 / vec2(resolution) - 1.0;
-  pos.z = depth * (far - near) + near;
-  pos.y = tanFov * pos.z * fragCoord.y;
-  pos.x = tanFov * pos.z * aspect * fragCoord.x;
-  pos.z = -pos.z;
+  pos.z = near / (1.0 - ((far - near) / far) * depth);
+  pos.y = -tanFov * pos.z * fragCoord.y;
+  pos.x = -tanFov * pos.z * aspect * fragCoord.x;
+  pos.z = pos.z;
 
   vec3 normal = mat3(mView) * imageLoad(normals, ivec2(gl_GlobalInvocationID.xy)).xyz;
   vec3 pixel = imageLoad(albedo, ivec2(gl_GlobalInvocationID.xy)).rgb;
@@ -78,5 +78,4 @@ void main()
   pixel *= light;
 
   imageStore(albedo, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
-  //imageStore(normals, ivec2(gl_GlobalInvocationID.xy), vec4(fragCoord, 1.0, 1.0));
 }

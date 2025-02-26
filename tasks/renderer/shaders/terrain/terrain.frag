@@ -8,8 +8,8 @@ layout(binding = 1) uniform sampler2D normalMap;
 
 layout(location = 0) in vec2 inTexCoord;
 
-const vec3 grass = vec3(1, 1, 1); //vec3(72, 140, 49) / 255.0;
-const vec3 dirt = vec3(1, 1, 1); //vec3(136, 102, 59) / 255.0;
+const vec3 grass = vec3(72, 140, 49) / 255.0;
+const vec3 dirt = vec3(136, 102, 59) / 255.0;
 const float degree = 0.6;
 
 void main()
