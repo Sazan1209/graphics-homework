@@ -6,6 +6,8 @@
 #include <etna/Profiling.hpp>
 #include <glm/ext.hpp>
 #include "shaders/tonemap/tonemap.h"
+#include "shaders/resolve.h"
+#include "shaders/terrain/terrain.h"
 
 WorldRenderer::WorldRenderer(const etna::GpuWorkCount& workCount)
   : sceneMgr{std::make_unique<SceneManager>()}
@@ -65,9 +67,12 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .format = vk::Format::eR8G8B8A8Snorm,
     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
 
-  // lightList = ctx.createBuffer(etna::Buffer::CreateInfo{
-  //                                                       .size = ()
-  // })
+  lightList = ctx.createBuffer(etna::Buffer::CreateInfo{
+    .size = sizeof(resolve::PointLight) * 128,
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+    .name = "light_list",
+  });
 
   tonemapHist = ctx.createBuffer(etna::Buffer::CreateInfo{
     .size = (tonemap_const::bucketCount + 2) * 4,
@@ -112,7 +117,7 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
 
 
     etna::flush_barriers(cmd_buf);
-    cmd_buf.dispatch(4096 / 32, 4096 / 32, 1);
+    cmd_buf.dispatch(terrain::heightMapSize.x / 32, terrain::heightMapSize.y / 32, 1);
   }
 
   {
@@ -149,7 +154,36 @@ void WorldRenderer::createTerrainMap(vk::CommandBuffer cmd_buf)
       nullptr);
 
     etna::flush_barriers(cmd_buf);
-    cmd_buf.dispatch(4096 / 32, 4096 / 32, 1);
+    cmd_buf.dispatch(terrain::heightMapSize.x / 32, terrain::heightMapSize.y / 32, 1);
+  }
+
+  {
+    auto info = etna::get_shader_program("lightgen");
+    auto binding0 = heightMap.genBinding(perlinSampler.get(), vk::ImageLayout::eGeneral, {});
+    auto binding1 = lightList.genBinding();
+
+    auto set = etna::create_descriptor_set(
+      info.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, binding0},
+        etna::Binding{1, binding1},
+      });
+
+    vk::DescriptorSet vkSet = set.getVkSet();
+
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, lightgenPipeline.getVkPipeline());
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eCompute,
+      lightgenPipeline.getVkPipelineLayout(),
+      0,
+      1,
+      &vkSet,
+      0,
+      nullptr);
+
+    etna::flush_barriers(cmd_buf);
+    cmd_buf.dispatch(1, 1, 1);
   }
 
   etna::set_state(
@@ -183,6 +217,7 @@ void WorldRenderer::loadShaders()
      COMPLETE_RENDERER_SHADERS_ROOT "static_mesh.vert.spv"});
   etna::create_program("perlin", {COMPLETE_RENDERER_SHADERS_ROOT "perlin.comp.spv"});
   etna::create_program("normal", {COMPLETE_RENDERER_SHADERS_ROOT "normal.comp.spv"});
+  etna::create_program("lightgen", {COMPLETE_RENDERER_SHADERS_ROOT "lightgen.comp.spv"});
   etna::create_program(
     "terrain_render",
     {COMPLETE_RENDERER_SHADERS_ROOT "terrain.vert.spv",
@@ -195,6 +230,10 @@ void WorldRenderer::loadShaders()
   etna::create_program("tonemap_cumsum", {COMPLETE_RENDERER_SHADERS_ROOT "cumsum.comp.spv"});
   etna::create_program("tonemap", {COMPLETE_RENDERER_SHADERS_ROOT "tonemap.comp.spv"});
   etna::create_program("resolve", {COMPLETE_RENDERER_SHADERS_ROOT "resolve.comp.spv"});
+  etna::create_program(
+    "cube",
+    {COMPLETE_RENDERER_SHADERS_ROOT "cube.frag.spv",
+     COMPLETE_RENDERER_SHADERS_ROOT "cube.vert.spv"});
 }
 
 void WorldRenderer::setupPipelines()
@@ -240,8 +279,42 @@ void WorldRenderer::setupPipelines()
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
+  cubePipeline =
+    pipelineManager.createGraphicsPipeline(
+      "cube",
+      etna::GraphicsPipeline::CreateInfo{
+        .vertexShaderInput = sceneVertexInputDesc,
+        .rasterizationConfig =
+          vk::PipelineRasterizationStateCreateInfo{
+            .polygonMode = vk::PolygonMode::eFill,
+            .cullMode = vk::CullModeFlagBits::eBack,
+            .frontFace = vk::FrontFace::eCounterClockwise,
+            .lineWidth = 1.f,
+          },
+        .blendingConfig =
+          {.attachments =
+             {vk::PipelineColorBlendAttachmentState{
+                .blendEnable = vk::False,
+                .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+              },
+              vk::PipelineColorBlendAttachmentState{
+                .blendEnable = vk::False,
+                .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+              }},
+           .logicOp = vk::LogicOp::eSet},
+        .fragmentShaderOutput =
+          {
+            .colorAttachmentFormats =
+              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eB10G11R11UfloatPack32},
+            .depthAttachmentFormat = vk::Format::eD32Sfloat,
+          },
+      });
+
   perlinPipeline = pipelineManager.createComputePipeline("perlin", {});
   normalPipeline = pipelineManager.createComputePipeline("normal", {});
+  lightgenPipeline = pipelineManager.createComputePipeline("lightgen", {});
   terrainPipeline =
     pipelineManager.createGraphicsPipeline(
       "terrain_render",
@@ -297,7 +370,7 @@ void WorldRenderer::update(const FramePacket& packet)
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
     nearPlane = packet.mainCam.zNear;
     farPlane = packet.mainCam.zFar;
-    tanFov = glm::tan(packet.mainCam.fov);
+    tanFov = glm::tan(glm::radians(packet.mainCam.fov) / 2.0);
     eye = packet.mainCam.position;
   }
 }
@@ -342,6 +415,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, staticMeshPipeline.getVkPipeline());
     renderScene(cmd_buf, worldViewProj, staticMeshPipeline.getVkPipelineLayout());
     renderTerrain(cmd_buf);
+    // renderCube(cmd_buf);
   }
 
   resolve(cmd_buf);
@@ -483,6 +557,27 @@ void WorldRenderer::renderTerrain(vk::CommandBuffer cmd_buf)
   cmd_buf.draw(3, (4096 * 4096) / (128 * 128), 0, 0);
 }
 
+void WorldRenderer::renderCube(vk::CommandBuffer cmd_buf)
+{
+
+  ETNA_PROFILE_GPU(cmd_buf, cube);
+  auto info = etna::get_shader_program("cube");
+  auto bind0 = lightList.genBinding();
+
+  auto descSet =
+    etna::create_descriptor_set(info.getDescriptorLayoutId(0), cmd_buf, {etna::Binding{0, bind0}});
+  auto vkSet = descSet.getVkSet();
+  auto layout = cubePipeline.getVkPipelineLayout();
+
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, cubePipeline.getVkPipeline());
+  cmd_buf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, 1, &vkSet, 0, nullptr);
+
+  cmd_buf.pushConstants<glm::mat4>(layout, vk::ShaderStageFlagBits::eVertex, 0, worldViewProj);
+
+  cmd_buf.draw(36, 128, 0, 0);
+}
+
+
 void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, resolve);
@@ -490,13 +585,15 @@ void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
   auto binding0 = gBuffer.color.genBinding({}, vk::ImageLayout::eGeneral, {});
   auto binding1 = gBuffer.depthStencil.genBinding({}, vk::ImageLayout::eGeneral, {});
   auto binding2 = gBuffer.normal.genBinding({}, vk::ImageLayout::eGeneral, {});
-  // auto binding3 = lightList.genBinding();
+  auto binding3 = lightList.genBinding();
   auto set = etna::create_descriptor_set(
     info.getDescriptorLayoutId(0),
     cmd_buf,
     {
-      etna::Binding{0, binding0}, etna::Binding{1, binding1}, etna::Binding{2, binding2},
-      // etna::Binding{3, binding3},
+      etna::Binding{0, binding0},
+      etna::Binding{1, binding1},
+      etna::Binding{2, binding2},
+      etna::Binding{3, binding3},
     });
   vk::DescriptorSet vkSet = set.getVkSet();
   cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, resolvePipeline.getVkPipeline());

@@ -1,61 +1,50 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "terrain.glsl"
 
 layout(vertices = 2) out;
-
-layout(push_constant) uniform params_t
+layout(push_constant) uniform pc
 {
   mat4 mProjView;
   vec3 eye;
 };
 
+layout(location = 0) in uint inInstanceIndex[];
 
-const vec3 startPos = vec3(-512, -100, -512);
-const uint squareSize = 32;
+layout(location = 0) out vec3 outWorldPos[];
+layout(location = 1) out vec2 outTexCoord[];
 
-layout(location = 0) in uint InstanceIndex[];
-
-layout(location = 0) out vec3 WorldPos_ES_in[];
-layout(location = 1) out vec2 TexCoord_ES_in[];
-layout(location = 2) out float GridSize[];
-
-const float maxDist = 600.0; // probably too big
-const float minDist = 1.0;
-
-const float maxTess = 20.0;
-const float minTess = 4.0;
-
-vec3 calcPos(in uint cornerNum)
+vec3 calcPosWorld(in uint cornerNum)
 {
-  const uint gridSize = 1024 / squareSize;
-  uvec2 sqrCoord = uvec2(InstanceIndex[0] % gridSize, (1023u - InstanceIndex[0]) / gridSize);
-  uvec2 offset = uvec2(cornerNum / 2u, 1u - (cornerNum % 2u));
-  return vec3((sqrCoord + offset) * squareSize, 0).xzy + startPos;
+  const uint ind = inInstanceIndex[0];
+  vec2 sqrCoord = vec2(ind % gridSize.x, ind / gridSize.x);
+  vec2 cornerOffset = vec2(cornerNum / 2u, cornerNum % 2);
+  vec3 cornerPosModel = vec3((sqrCoord + cornerOffset) * squareSize, 0).xzy;
+
+  // The transformation is done such that the center is at centerPosWorld afterwards
+  vec3 cornerPosWorld = cornerPosModel - centerCoordModel;
+  cornerPosWorld.z = -cornerPosWorld.z;
+  cornerPosWorld += centerCoordWorld;
+
+  return cornerPosWorld;
 }
 
 vec2 calcTexcoord(in uint cornerNum)
 {
-  const uint gridSize = 1024 / squareSize;
-  uvec2 sqrCoord = uvec2(InstanceIndex[0] % gridSize, InstanceIndex[0] / gridSize);
-  uvec2 offset = uvec2(cornerNum / 2u, cornerNum % 2u);
-  return vec2((sqrCoord + offset) * squareSize) / 1024;
+  const uint ind = inInstanceIndex[0];
+  vec2 sqrCoord = vec2(ind % gridSize.x, ind / gridSize.x);
+  vec2 cornerOffset = vec2(cornerNum / 2u, cornerNum % 2u);
+  return (sqrCoord + cornerOffset) / vec2(gridSize);
 }
+
+// Tesselation level is inversely proportional to distance, so that an object twice as small on the
+// screen has a tess level that's twice as small
 
 float GetTessLevel(in float dist)
 {
-  dist = clamp((dist - minDist) / (maxDist - minDist), 0.0, 1.0);
-  dist = sqrt(dist);
-  return mix(maxTess, minTess, dist);
-}
-
-bool within(float a, float x, float b)
-{
-  return a <= x && x <= b;
-}
-
-bool Seen(vec3 point)
-{
-  vec4 proj = mProjView * vec4(point, 1);
-  return within(0.0, proj.z, proj.w);
+  float coef = 1.0 / (1.0 + dist * tessCoefficient);
+  return mix(maxTess, minTess, coef);
 }
 
 bool Cull(vec3 minP, vec3 maxP)
@@ -86,15 +75,15 @@ bool Cull(vec3 minP, vec3 maxP)
 
 void main()
 {
-  const vec3 corner00 = calcPos(0);
-  const vec3 corner01 = calcPos(1);
-  const vec3 corner10 = calcPos(2);
-  const vec3 corner11 = calcPos(3);
+  const vec3 corner00 = calcPosWorld(0);
+  const vec3 corner01 = calcPosWorld(1);
+  const vec3 corner10 = calcPosWorld(2);
+  const vec3 corner11 = calcPosWorld(3);
 
   vec3 minP = corner01;
-  minP.y += -200.0;
+  minP.y += -zScale;
   vec3 maxP = corner10;
-  maxP.y += 200.0;
+  maxP.y += zScale;
 
   if (Cull(minP, maxP))
   {
@@ -126,7 +115,6 @@ void main()
   gl_TessLevelInner[0] = centerTess;
   gl_TessLevelInner[1] = centerTess;
 
-  WorldPos_ES_in[gl_InvocationID] = gl_InvocationID == 0 ? corner00 : corner11;
-  TexCoord_ES_in[gl_InvocationID] = gl_InvocationID == 0 ? calcTexcoord(0) : calcTexcoord(3);
-  GridSize[gl_InvocationID] = squareSize / (centerTess * 1024.0);
+  outWorldPos[gl_InvocationID] = gl_InvocationID == 0 ? corner00 : corner11;
+  outTexCoord[gl_InvocationID] = gl_InvocationID == 0 ? calcTexcoord(0) : calcTexcoord(3);
 }

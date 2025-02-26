@@ -35,6 +35,7 @@ private:
     vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
   void createTerrainMap(vk::CommandBuffer cmd_buf);
   void renderTerrain(vk::CommandBuffer cmd_buf);
+  void renderCube(vk::CommandBuffer cmd_buf);
   void tonemap(vk::CommandBuffer cmd_buf);
   void resolve(vk::CommandBuffer cmd_buf);
 
@@ -66,6 +67,7 @@ private:
   etna::GraphicsPipeline staticMeshPipeline{};
   etna::ComputePipeline perlinPipeline{};
   etna::ComputePipeline normalPipeline{};
+  etna::ComputePipeline lightgenPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
   etna::ComputePipeline tonemapMinmaxPipeline{};
   etna::ComputePipeline tonemapEqualizePipeline{};
@@ -73,6 +75,7 @@ private:
   etna::ComputePipeline tonemapCumsumPipeline{};
   etna::ComputePipeline tonemapPipeline{};
   etna::ComputePipeline resolvePipeline{};
+  etna::GraphicsPipeline cubePipeline{};
 
   struct TerrainPushConst
   {

@@ -16,6 +16,7 @@ target_add_shaders(complete_renderer
 
   shaders/terrain/perlin.comp
   shaders/terrain/normal.comp
+  shaders/terrain/lightgen.comp
   shaders/terrain/terrain.vert
   shaders/terrain/terrain.tesc
   shaders/terrain/terrain.tese
@@ -26,4 +27,7 @@ target_add_shaders(complete_renderer
   shaders/tonemap/equalize.comp
   shaders/tonemap/cumsum.comp
   shaders/tonemap/tonemap.comp
+
+  shaders/cube.frag
+  shaders/cube.vert
 )

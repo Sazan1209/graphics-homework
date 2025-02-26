@@ -10,36 +10,21 @@ layout(push_constant) uniform params_t
   vec3 eye;
 };
 
-const float zScale = 200.0;
+layout(location = 0) in vec3 inWorldPos[];
+layout(location = 1) in vec2 inTexCoord[];
 
-layout(location = 0) in vec3 WorldPos_ES_in[];
-layout(location = 1) in vec2 TexCoord_ES_in[];
-layout(location = 2) in float GridSize[];
-
-layout(location = 0) out vec2 out_texCoord;
+layout(location = 0) out vec2 outTexCoord;
 
 out gl_PerVertex
 {
   vec4 gl_Position;
 };
 
-vec3 calcNorm(vec2 texCoord)
-{
-  const float pixSize = GridSize[0];
-  float left = texture(perlinNoise, texCoord - vec2(-1, 0) * pixSize).x * zScale;
-  float right = texture(perlinNoise, texCoord + vec2(-1, 0) * pixSize).x * zScale;
-  float up = texture(perlinNoise, texCoord - vec2(0, -1) * pixSize).x * zScale;
-  float down = texture(perlinNoise, texCoord + vec2(0, -1) * pixSize).x * zScale;
-
-  return normalize(vec3(right - left, 2.0 * pixSize, up - down));
-}
-
 void main()
 {
   vec3 wPos;
-  wPos.y = WorldPos_ES_in[0].y;
-  wPos.xz = mix(WorldPos_ES_in[0].xz, WorldPos_ES_in[1].xz, gl_TessCoord.xy);
-  out_texCoord = mix(TexCoord_ES_in[0], TexCoord_ES_in[1], gl_TessCoord.xy);
-  wPos.y += texture(perlinNoise, out_texCoord).x * zScale;
+  wPos.xz = mix(inWorldPos[0].xz, inWorldPos[1].xz, gl_TessCoord.xy);
+  outTexCoord = mix(inTexCoord[0], inTexCoord[1], gl_TessCoord.xy);
+  wPos.y = inWorldPos[0].y + texture(perlinNoise, outTexCoord).x;
   gl_Position = mProjView * vec4(wPos, 1.0);
 }
