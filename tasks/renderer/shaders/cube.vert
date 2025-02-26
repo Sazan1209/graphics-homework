@@ -33,17 +33,17 @@ vec3 cubeVertices[] = {
 
 vec3 normals[] = {
   vec3(1, 0, 0),
-  vec3(0, 0, -1),
+  vec3(0, 0, 1),
   vec3(0, -1, 0),
-  vec3(0, 0, -1),
+  vec3(0, 0, 1),
   vec3(1, 0, 0),
   vec3(0, -1, 0),
-  vec3(0, 0, 1),
+  vec3(0, 0, -1),
   vec3(-1, 0, 0),
   vec3(-1, 0, 0),
   vec3(0, 1, 0),
   vec3(0, 1, 0),
-  vec3(0, 0, 1),
+  vec3(0, 0, -1),
 };
 
 void main()
@@ -53,5 +53,5 @@ void main()
 
   out_normal = normals[vInd / 3];
   out_color = lights[iInd].color;
-  gl_Position = mProjView * vec4(cubeVertices[vInd] * 5 + lights[iInd].pos, 1.0);
+  gl_Position = mProjView * vec4(cubeVertices[vInd] + lights[iInd].pos, 1.0);
 }

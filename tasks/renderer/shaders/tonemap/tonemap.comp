@@ -10,13 +10,13 @@ layout(binding = 1, std430) buffer A
 {
   float minLum;
   float maxLum;
-  uint cumDist[bucketCount];
+  float cumDist[bucketCount];
 };
 
 void main()
 {
   const ivec2 size = imageSize(image);
-  if (size.x <= gl_GlobalInvocationID.x || size.y <= gl_GlobalInvocationID.y)
+  if (!all(greaterThan(size, gl_GlobalInvocationID.xy)))
   {
     return;
   }
@@ -43,7 +43,7 @@ void main()
     const float distrPrev = ind == 0 ? 0.0 : float(cumDist[ind - 1]) / total;
     const float distr = float(cumDist[ind]) / total;
 
-    const float coef = (b - minB - float(ind) * dB) / dB;
+    const float coef = (b - minB) / dB - float(ind);
     const float diff = mix(distrPrev, distr, coef);
 
     const float resB = mix(minScreenB, maxScreenB, diff);

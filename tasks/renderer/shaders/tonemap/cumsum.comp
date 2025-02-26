@@ -9,18 +9,22 @@ layout(binding = 0, std430) buffer A
 {
   float minLum;
   float maxLum;
-  uint buf[bucketCount];
+  float buf[bucketCount];
 };
+
+shared float localBuf[bucketCount];
 
 // not the most efficient solution, but one of the easiest
 void main()
 {
   const uint ind = gl_LocalInvocationIndex;
-  uint res = 0;
-  for (uint i = 0; i < ind; ++i)
+  localBuf[ind] = buf[ind];
+  for (uint i = 1; i < bucketCount; i <<= 1)
   {
-    res += buf[i];
+    barrier();
+    if ((ind & i) != 0){
+      localBuf[ind] += localBuf[(ind ^ i) | (i - 1)];
+    }
   }
-  barrier();
-  buf[ind] += res;
+  buf[ind] = localBuf[ind];
 }

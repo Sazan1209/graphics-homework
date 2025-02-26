@@ -12,8 +12,34 @@ layout(binding = 0, std430) buffer A
   uint buf[bucketCount];
 };
 
-shared uint total;
-shared uint trim;
+shared float total;
+shared float trim;
+shared float localBuf[bucketCount];
+shared float sumBuf[bucketCount];
+
+void sum()
+{
+  uint ind = gl_LocalInvocationIndex;
+  sumBuf[ind] = localBuf[ind];
+
+  for (uint i = 1; i < bucketCount; i <<= 1)
+  {
+    barrier();
+    if ((ind & i) != 0){
+      sumBuf[ind] += sumBuf[ind ^ i];
+    } else {
+      ind = 0;
+    }
+  }
+  if (ind == bucketCount - 1)
+  {
+    float newTotal = sumBuf[ind];
+    trim = total - newTotal;
+    total = newTotal;
+  }
+
+  barrier();
+}
 
 void main()
 {
@@ -24,39 +50,22 @@ void main()
   const float dB = (log(maxLum) - log(minLum)) / bucketCount;
   const float coef = dB / (maxScreenB - minScreenB);
   const uint ind = gl_LocalInvocationIndex;
-  if (ind == 0)
-  {
-    total = 0;
-  }
+  localBuf[ind] = buf[ind];
+  sum();
 
-  barrier();
-
-  atomicAdd(total, buf[ind]);
-
-  barrier();
-
-  const uint tolerance = uint((2.5 / 100.0) * total);
+  const float tolerance = (2.5 / 100.0) * total;
 
   do
   {
+    float ceiling = total * coef;
+
     barrier();
 
-    if (ind == 0)
+    if (ceiling < localBuf[ind])
     {
-      trim = 0;
+      localBuf[ind] = ceiling;
     }
-    const uint ceiling = uint(total * coef);
-
-    barrier();
-
-    if (ceiling < buf[ind])
-    {
-      atomicAdd(trim, buf[ind] - ceiling);
-      atomicAdd(total, ceiling - buf[ind]);
-      buf[ind] = ceiling;
-    }
-
-    barrier();
-
+    sum();
   } while (trim > tolerance);
+  buf[ind] = floatBitsToUint(localBuf[ind]);
 }

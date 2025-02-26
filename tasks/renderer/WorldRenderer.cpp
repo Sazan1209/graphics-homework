@@ -74,6 +74,18 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .name = "light_list",
   });
 
+  // {
+  //   double aspect = double(resolution.x) / double(resolution.y);
+  //   uint32_t yLen = static_cast<uint32_t>(glm::ceil(2 * tanFov / 0.01745));
+  //   uint32_t xLen = static_cast<uint32_t>(glm::ceil(2 * tanFov * aspect / 0.01745));
+
+  //   tonemapDownscaled = ctx.createImage(etna::Image::CreateInfo{
+  //     .extent = vk::Extent3D{xLen, yLen, 1},
+  //     .name = "tonemap_image_downscaled",
+  //     .format = vk::Format::eB10G11R11UfloatPack32,
+  //     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
+  // }
+
   tonemapHist = ctx.createBuffer(etna::Buffer::CreateInfo{
     .size = (tonemap_const::bucketCount + 2) * 4,
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,

@@ -31,7 +31,7 @@ void main()
   vec2 texCoord = vec2(rand(-2), rand(-1));
 
   float height = imageLoad(heightMap, ivec2(floor(texCoord * vec2(heightMapSize)))).x;
-  height += 20;
+  height += 5;
 
   vec3 posModel = vec3(texCoord * terrainSize, height).xzy;
 
