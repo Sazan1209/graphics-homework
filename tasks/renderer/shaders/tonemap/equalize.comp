@@ -1,0 +1,71 @@
+#version 430
+#extension GL_GOOGLE_include_directive : require
+
+#include "tonemap.glsl"
+
+layout(local_size_x = BUCKET_COUNT) in;
+
+layout(binding = 0, std430) buffer A
+{
+  float minLum;
+  float maxLum;
+  uint buf[bucketCount];
+};
+
+shared float total;
+shared float trim;
+shared float localBuf[bucketCount];
+shared float sumBuf[bucketCount];
+
+void sum()
+{
+  uint ind = gl_LocalInvocationIndex;
+  sumBuf[ind] = localBuf[ind];
+
+  for (uint i = 1; i < bucketCount; i <<= 1)
+  {
+    barrier();
+    if ((ind & i) != 0){
+      sumBuf[ind] += sumBuf[ind ^ i];
+    } else {
+      ind = 0;
+    }
+  }
+  if (ind == bucketCount - 1)
+  {
+    float newTotal = sumBuf[ind];
+    trim = total - newTotal;
+    total = newTotal;
+  }
+
+  barrier();
+}
+
+void main()
+{
+  if (maxLum / minLum <= maxScreenLum / minScreenLum)
+  {
+    return;
+  }
+  const float dB = (log(maxLum) - log(minLum)) / bucketCount;
+  const float coef = dB / (maxScreenB - minScreenB);
+  const uint ind = gl_LocalInvocationIndex;
+  localBuf[ind] = buf[ind];
+  sum();
+
+  const float tolerance = (2.5 / 100.0) * total;
+
+  do
+  {
+    float ceiling = total * coef;
+
+    barrier();
+
+    if (ceiling < localBuf[ind])
+    {
+      localBuf[ind] = ceiling;
+    }
+    sum();
+  } while (trim > tolerance);
+  buf[ind] = floatBitsToUint(localBuf[ind]);
+}

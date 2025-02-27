@@ -1,0 +1,30 @@
+#version 430
+#extension GL_GOOGLE_include_directive : require
+
+#include "tonemap.glsl"
+
+layout(local_size_x = BUCKET_COUNT) in;
+
+layout(binding = 0, std430) buffer A
+{
+  float minLum;
+  float maxLum;
+  float buf[bucketCount];
+};
+
+shared float localBuf[bucketCount];
+
+// not the most efficient solution, but one of the easiest
+void main()
+{
+  const uint ind = gl_LocalInvocationIndex;
+  localBuf[ind] = buf[ind];
+  for (uint i = 1; i < bucketCount; i <<= 1)
+  {
+    barrier();
+    if ((ind & i) != 0){
+      localBuf[ind] += localBuf[(ind ^ i) | (i - 1)];
+    }
+  }
+  buf[ind] = localBuf[ind];
+}
