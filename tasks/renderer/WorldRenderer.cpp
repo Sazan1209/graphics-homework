@@ -386,7 +386,7 @@ void WorldRenderer::update(const FramePacket& packet)
     worldViewProj = packet.mainCam.projTm(aspect) * packet.mainCam.viewTm();
     nearPlane = packet.mainCam.zNear;
     farPlane = packet.mainCam.zFar;
-    tanFov = glm::tan(glm::radians(packet.mainCam.fov) / 2.0);
+    tanFov = glm::tan(glm::radians(packet.mainCam.fov) / 2.0f);
     eye = packet.mainCam.position;
   }
 }
