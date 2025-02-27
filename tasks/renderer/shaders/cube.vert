@@ -3,7 +3,7 @@
 
 #include "resolve.h"
 
-layout(binding = 0, std430) buffer a
+layout(binding = 0, std430) readonly restrict buffer cubevert_buf
 {
   PointLight lights[];
 };
@@ -11,7 +11,7 @@ layout(binding = 0, std430) buffer a
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec3 out_color;
 
-layout(push_constant) uniform a
+layout(push_constant) uniform cubevert_pc
 {
   mat4 mProjView;
 };

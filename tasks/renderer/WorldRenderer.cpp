@@ -638,6 +638,27 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
 
   // Possibly transfer layout for imageDownscaled
 
+  {
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
+    vk::BufferMemoryBarrier2 barrierBuf = {
+      .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .srcAccessMask = vk::AccessFlagBits2::eShaderStorageRead,
+      .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+      .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .buffer = tonemapHist.get(),
+      .offset = 0,
+      .size = VK_WHOLE_SIZE};
+
+    depInfo.bufferMemoryBarrierCount = 1;
+    depInfo.pBufferMemoryBarriers = &barrierBuf;
+
+    cmd_buf.pipelineBarrier2(depInfo);
+  }
+
   cmd_buf.fillBuffer(tonemapHist.get(), 0, VK_WHOLE_SIZE, 0);
 
   {

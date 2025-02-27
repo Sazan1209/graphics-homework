@@ -4,7 +4,7 @@
 #include "terrain.glsl"
 
 layout(vertices = 2) out;
-layout(push_constant) uniform pc
+layout(push_constant) uniform terraintesc_pc
 {
   mat4 mProjView;
   vec3 eye;

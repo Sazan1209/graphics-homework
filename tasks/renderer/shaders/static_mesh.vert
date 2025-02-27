@@ -7,7 +7,7 @@
 layout(location = 0) in vec4 vPosNorm;
 layout(location = 1) in vec4 vTexCoordAndTang;
 
-layout(push_constant) uniform params_t
+layout(push_constant) uniform staticvert_pc
 {
   mat4 mProjView;
 }

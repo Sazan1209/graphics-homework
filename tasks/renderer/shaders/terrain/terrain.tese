@@ -4,7 +4,7 @@
 layout(quads, fractional_even_spacing, cw) in;
 
 layout(binding = 0) uniform sampler2D perlinNoise;
-layout(push_constant) uniform params_t
+layout(push_constant) uniform terraintest_pc
 {
   mat4 mProjView;
   vec3 eye;
