@@ -54,6 +54,7 @@ private:
     etna::Image depthStencil;
   } gBuffer;
 
+  etna::Image tonemapDownscaledImage;
   etna::Buffer tonemapHist;
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
 
@@ -69,6 +70,7 @@ private:
   etna::ComputePipeline normalPipeline{};
   etna::ComputePipeline lightgenPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
+  etna::ComputePipeline tonemapDownscalePipeline{};
   etna::ComputePipeline tonemapMinmaxPipeline{};
   etna::ComputePipeline tonemapEqualizePipeline{};
   etna::ComputePipeline tonemapHistPipeline{};
@@ -93,4 +95,5 @@ private:
   etna::Sampler perlinSampler;
 
   glm::uvec2 resolution;
+  glm::uvec2 downscaledRes;
 };

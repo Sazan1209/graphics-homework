@@ -10,7 +10,7 @@ layout(location = 0) in vec2 inTexCoord;
 
 const vec3 grass = vec3(72, 140, 49) / 255.0;
 const vec3 dirt = vec3(136, 102, 59) / 255.0;
-const float degree = 0.6;
+const float degree = 0.7;
 
 void main()
 {

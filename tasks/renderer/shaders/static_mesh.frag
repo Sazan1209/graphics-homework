@@ -8,9 +8,7 @@ layout(location = 1) out vec4 out_normal;
 
 layout(location = 0) in in_vs_out
 {
-  vec3 wPos;
   vec3 wNorm;
-  vec3 wTangent;
   vec2 texCoord;
 };
 

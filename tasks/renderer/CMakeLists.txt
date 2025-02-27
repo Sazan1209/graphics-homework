@@ -22,6 +22,7 @@ target_add_shaders(complete_renderer
   shaders/terrain/terrain.tese
   shaders/terrain/terrain.frag
 
+  shaders/tonemap/downscale.comp
   shaders/tonemap/minmax.comp
   shaders/tonemap/hist.comp
   shaders/tonemap/equalize.comp

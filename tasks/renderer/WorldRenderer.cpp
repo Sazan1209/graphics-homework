@@ -74,17 +74,19 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .name = "light_list",
   });
 
-  // {
-  //   double aspect = double(resolution.x) / double(resolution.y);
-  //   uint32_t yLen = static_cast<uint32_t>(glm::ceil(2 * tanFov / 0.01745));
-  //   uint32_t xLen = static_cast<uint32_t>(glm::ceil(2 * tanFov * aspect / 0.01745));
+  {
+    // todo fix this
+    // double aspect = double(resolution.x) / double(resolution.y);
+    uint32_t yLen = 45; // static_cast<uint32_t>(glm::ceil(2 * tanFov / 0.01745));
+    uint32_t xLen = 80; // static_cast<uint32_t>(glm::ceil(2 * tanFov * aspect / 0.01745));
+    downscaledRes = glm::uvec2(xLen, yLen);
 
-  //   tonemapDownscaled = ctx.createImage(etna::Image::CreateInfo{
-  //     .extent = vk::Extent3D{xLen, yLen, 1},
-  //     .name = "tonemap_image_downscaled",
-  //     .format = vk::Format::eB10G11R11UfloatPack32,
-  //     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
-  // }
+    tonemapDownscaledImage = ctx.createImage(etna::Image::CreateInfo{
+      .extent = vk::Extent3D{xLen, yLen, 1},
+      .name = "tonemap_image_downscaled",
+      .format = vk::Format::eB10G11R11UfloatPack32,
+      .imageUsage = vk::ImageUsageFlagBits::eStorage});
+  }
 
   tonemapHist = ctx.createBuffer(etna::Buffer::CreateInfo{
     .size = (tonemap_const::bucketCount + 2) * 4,
@@ -236,6 +238,7 @@ void WorldRenderer::loadShaders()
      COMPLETE_RENDERER_SHADERS_ROOT "terrain.tesc.spv",
      COMPLETE_RENDERER_SHADERS_ROOT "terrain.tese.spv",
      COMPLETE_RENDERER_SHADERS_ROOT "terrain.frag.spv"});
+  etna::create_program("tonemap_downscale", {COMPLETE_RENDERER_SHADERS_ROOT "downscale.comp.spv"});
   etna::create_program("tonemap_minmax", {COMPLETE_RENDERER_SHADERS_ROOT "minmax.comp.spv"});
   etna::create_program("tonemap_equalize", {COMPLETE_RENDERER_SHADERS_ROOT "equalize.comp.spv"});
   etna::create_program("tonemap_hist", {COMPLETE_RENDERER_SHADERS_ROOT "hist.comp.spv"});
@@ -360,6 +363,7 @@ void WorldRenderer::setupPipelines()
           },
       });
 
+  tonemapDownscalePipeline = pipelineManager.createComputePipeline("tonemap_downscale", {});
   tonemapMinmaxPipeline = pipelineManager.createComputePipeline("tonemap_minmax", {});
   tonemapEqualizePipeline = pipelineManager.createComputePipeline("tonemap_equalize", {});
   tonemapHistPipeline = pipelineManager.createComputePipeline("tonemap_hist", {});
@@ -488,6 +492,7 @@ void WorldRenderer::renderScene(
 {
   if (!sceneMgr->getVertexBuffer())
     return;
+  ETNA_PROFILE_GPU(cmd_buf, renderScene);
 
   cmd_buf.bindVertexBuffers(0, {sceneMgr->getVertexBuffer()}, {0});
   cmd_buf.bindIndexBuffer(sceneMgr->getIndexBuffer(), 0, vk::IndexType::eUint32);
@@ -546,6 +551,7 @@ void WorldRenderer::renderScene(
 
 void WorldRenderer::renderTerrain(vk::CommandBuffer cmd_buf)
 {
+  ETNA_PROFILE_GPU(cmd_buf, renderTerrain);
   auto info = etna::get_shader_program("terrain_render");
   auto bind0 = heightMap.genBinding(perlinSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
   auto bind1 = normalMap.genBinding(perlinSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -629,51 +635,22 @@ void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
 void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, tonemap);
-  vk::DependencyInfo depInfo{
-    .dependencyFlags = vk::DependencyFlagBits::eByRegion,
-  };
 
-  {
-    vk::BufferMemoryBarrier2 barrierBuf = {
-      .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-      .srcAccessMask = vk::AccessFlagBits2::eShaderStorageRead,
-      .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
-      .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .buffer = tonemapHist.get(),
-      .offset = 0,
-      .size = VK_WHOLE_SIZE};
-
-    depInfo.bufferMemoryBarrierCount = 1;
-    depInfo.pBufferMemoryBarriers = &barrierBuf;
-
-    cmd_buf.pipelineBarrier2(depInfo);
-  }
+  // Possibly transfer layout for imageDownscaled
 
   cmd_buf.fillBuffer(tonemapHist.get(), 0, VK_WHOLE_SIZE, 0);
 
   {
-    vk::BufferMemoryBarrier2 barrierBuf = {
-      .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
-      .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
-      .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-      .dstAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .buffer = tonemapHist.get(),
-      .offset = 0,
-      .size = VK_WHOLE_SIZE};
-
-    depInfo.bufferMemoryBarrierCount = 1;
-    depInfo.pBufferMemoryBarriers = &barrierBuf;
-
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
     vk::ImageMemoryBarrier2 barrierImg{
       .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
       .srcAccessMask =
         vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite,
       .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-      .dstAccessMask = vk::AccessFlagBits2::eShaderStorageRead,
+      .dstAccessMask =
+        vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite,
       .oldLayout = vk::ImageLayout::eGeneral,
       .newLayout = vk::ImageLayout::eGeneral,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -693,17 +670,83 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     depInfo.pImageMemoryBarriers = &barrierImg;
 
     cmd_buf.pipelineBarrier2(depInfo);
-
-    depInfo.imageMemoryBarrierCount = 0;
-    depInfo.pImageMemoryBarriers = nullptr;
   }
 
   {
-    auto minmaxInfo = etna::get_shader_program("tonemap_minmax");
+    auto info = etna::get_shader_program("tonemap_downscale");
     auto binding0 = gBuffer.color.genBinding({}, vk::ImageLayout::eGeneral, {});
+    auto binding1 = tonemapDownscaledImage.genBinding({}, vk::ImageLayout::eGeneral, {});
+    auto set = etna::create_descriptor_set(
+      info.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, binding0},
+        etna::Binding{1, binding1},
+      });
+    vk::DescriptorSet vkSet = set.getVkSet();
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, tonemapDownscalePipeline.getVkPipeline());
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eCompute,
+      tonemapDownscalePipeline.getVkPipelineLayout(),
+      0,
+      1,
+      &vkSet,
+      0,
+      nullptr);
+    etna::flush_barriers(cmd_buf);
+    cmd_buf.dispatch(downscaledRes.x, downscaledRes.y, 1);
+  }
+
+  {
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
+    vk::BufferMemoryBarrier2 barrierBuf = {
+      .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+      .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+      .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .dstAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .buffer = tonemapHist.get(),
+      .offset = 0,
+      .size = VK_WHOLE_SIZE};
+
+    depInfo.bufferMemoryBarrierCount = 1;
+    depInfo.pBufferMemoryBarriers = &barrierBuf;
+
+    vk::ImageMemoryBarrier2 barrierImg{
+      .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+      .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+      .dstAccessMask = vk::AccessFlagBits2::eShaderStorageRead,
+      .oldLayout = vk::ImageLayout::eGeneral,
+      .newLayout = vk::ImageLayout::eGeneral,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = tonemapDownscaledImage.get(),
+      .subresourceRange =
+        {
+          .aspectMask = vk::ImageAspectFlagBits::eColor,
+          .baseMipLevel = 0,
+          .levelCount = VK_REMAINING_MIP_LEVELS,
+          .baseArrayLayer = 0,
+          .layerCount = VK_REMAINING_ARRAY_LAYERS,
+        },
+    };
+
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers = &barrierImg;
+
+    cmd_buf.pipelineBarrier2(depInfo);
+  }
+
+  {
+    auto info = etna::get_shader_program("tonemap_minmax");
+    auto binding0 = tonemapDownscaledImage.genBinding({}, vk::ImageLayout::eGeneral, {});
     auto binding1 = tonemapHist.genBinding();
     auto set = etna::create_descriptor_set(
-      minmaxInfo.getDescriptorLayoutId(0),
+      info.getDescriptorLayoutId(0),
       cmd_buf,
       {
         etna::Binding{0, binding0},
@@ -720,10 +763,13 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
       0,
       nullptr);
     etna::flush_barriers(cmd_buf);
-    cmd_buf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
+    cmd_buf.dispatch((downscaledRes.x + 31) / 32, (downscaledRes.y + 31) / 32, 1);
   }
 
   {
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
     vk::BufferMemoryBarrier2 barrierBuf = {
       .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
       .srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
@@ -743,7 +789,7 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
 
   {
     auto histInfo = etna::get_shader_program("tonemap_hist");
-    auto binding0 = gBuffer.color.genBinding({}, vk::ImageLayout::eGeneral, {});
+    auto binding0 = tonemapDownscaledImage.genBinding({}, vk::ImageLayout::eGeneral, {});
     auto binding1 = tonemapHist.genBinding();
     auto set = etna::create_descriptor_set(
       histInfo.getDescriptorLayoutId(0),
@@ -763,10 +809,13 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
       0,
       nullptr);
     etna::flush_barriers(cmd_buf);
-    cmd_buf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
+    cmd_buf.dispatch((downscaledRes.x + 31) / 32, (downscaledRes.y + 31) / 32, 1);
   }
 
   {
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
     vk::BufferMemoryBarrier2 barrierBuf = {
       .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
       .srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
@@ -808,6 +857,9 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
   }
 
   {
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
     vk::BufferMemoryBarrier2 barrierBuf = {
       .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
       .srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
@@ -849,6 +901,9 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
   }
 
   {
+    vk::DependencyInfo depInfo{
+      .dependencyFlags = vk::DependencyFlagBits::eByRegion,
+    };
     vk::BufferMemoryBarrier2 barrierBuf = {
       .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
       .srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,

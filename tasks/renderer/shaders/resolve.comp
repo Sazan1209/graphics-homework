@@ -24,7 +24,7 @@ layout(binding = 3, std430) buffer a
 };
 
 
-const Sunlight sunlight = Sunlight(vec3(1.0 / 2, -sqrt(3.0) / 2.0, 0), 20, vec3(1, 1, 1), 0.5);
+const Sunlight sunlight = Sunlight(vec3(1.0 / 2, -sqrt(3.0) / 2.0, 0), 5, vec3(1, 1, 1), 0.5);
 const vec3 skyColor = sunlight.strength * vec3(135, 206, 235) / 255.0;
 
 void main()

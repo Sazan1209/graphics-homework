@@ -44,7 +44,7 @@ vec2 calcTexcoord(in uint cornerNum)
 float GetTessLevel(in float dist)
 {
   float coef = 1.0 / (1.0 + dist * tessCoefficient);
-  return mix(maxTess, minTess, coef);
+  return mix(minTess, maxTess, coef);
 }
 
 bool Cull(vec3 minP, vec3 maxP)
