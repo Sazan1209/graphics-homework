@@ -5,6 +5,10 @@
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
+layout(push_constant) uniform terraintest_pc{
+  bool forceLinear;
+};
+
 layout(binding = 0, r11f_g11f_b10f) restrict uniform image2D image;
 layout(binding = 1, std430) buffer A
 {
@@ -25,7 +29,7 @@ void main()
 
   const float lum = dot(pixel, lumVec);
   // linear interpolation
-  if (maxLum / minLum <= maxScreenLum / minScreenLum)
+  if (forceLinear || maxLum / minLum <= maxScreenLum / minScreenLum)
   {
     pixel = (pixel / maxLum);
   }

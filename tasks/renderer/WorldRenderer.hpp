@@ -99,6 +99,11 @@ private:
     float attenuationCoef = 0.005;
   } resolveUniformParams;
 
+  struct
+  {
+    shader_bool forceLinear = false;
+  } tonemapPushConstants;
+
   etna::Buffer resolveUniformParamsBuffer;
 
   glm::uvec2 resolution;

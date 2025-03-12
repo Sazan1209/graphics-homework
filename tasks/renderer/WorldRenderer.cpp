@@ -273,6 +273,11 @@ void WorldRenderer::drawGui()
     ImGui::PlotHistogram("Adjusted hist", (float*)tonemapHist.data() + 2, 128);
     ImGui::Value("Min lum", ((float*)tonemapHist.data())[0]);
     ImGui::Value("Max lum", ((float*)tonemapHist.data())[1]);
+    bool tmp = tonemapPushConstants.forceLinear;
+    if (ImGui::Checkbox("Force linear tonemapping", &tmp))
+    {
+      tonemapPushConstants.forceLinear = tmp ? 1 : 0;
+    }
   }
   if (ImGui::CollapsingHeader("Lighting"))
   {
@@ -869,6 +874,11 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
       &vkSet,
       0,
       nullptr);
+    cmd_buf.pushConstants<decltype(tonemapPushConstants)>(
+      tonemapPipeline.getVkPipelineLayout(),
+      vk::ShaderStageFlagBits::eCompute,
+      0,
+      tonemapPushConstants);
     etna::flush_barriers(cmd_buf);
     cmd_buf.dispatch((resolution.x + 31) / 32, (resolution.y + 31) / 32, 1);
   }
