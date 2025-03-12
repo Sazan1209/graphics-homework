@@ -4,6 +4,7 @@ add_executable(complete_renderer
   App.cpp
   Renderer.cpp
   WorldRenderer.cpp
+  TerrainGenerator.cpp
 )
 
 target_link_libraries(complete_renderer

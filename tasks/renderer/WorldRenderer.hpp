@@ -12,6 +12,7 @@
 #include "wsi/Keyboard.hpp"
 
 #include "FramePacket.hpp"
+#include "shaders/resolve.h"
 
 
 class WorldRenderer
@@ -48,7 +49,8 @@ private:
   etna::Image normalMap;
   etna::Buffer lightList;
 
-  struct {
+  struct
+  {
     etna::Image color;
     etna::Image normal;
     etna::Image depthStencil;
@@ -57,18 +59,12 @@ private:
   etna::Image tonemapDownscaledImage;
   etna::Buffer tonemapHist;
   etna::GpuSharedResource<etna::Buffer> modelMatrices;
+  etna::Sampler defaultSampler;
 
   glm::mat4x4 worldViewProj;
-  glm::mat4 worldView;
   glm::vec3 eye;
-  float nearPlane;
-  float farPlane;
-  float tanFov;
 
   etna::GraphicsPipeline staticMeshPipeline{};
-  etna::ComputePipeline perlinPipeline{};
-  etna::ComputePipeline normalPipeline{};
-  etna::ComputePipeline lightgenPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
   etna::ComputePipeline tonemapDownscalePipeline{};
   etna::ComputePipeline tonemapMinmaxPipeline{};
@@ -85,14 +81,23 @@ private:
     glm::vec3 eye;
   };
 
-  struct ResolvePushConstant{
+  struct
+  {
+    resolve::Sunlight sunlight = {
+      glm::vec3(1.0 / 2, -glm::sqrt(3.0) / 2.0, 0), 0.0, glm::vec3(1, 1, 1), 0.05};
+
+    glm::vec3 skyColor = glm::vec3(135, 206, 235) / 255.0f;
+    float lightExponent = 1.0f;
+
     glm::mat4 mView;
+
     float near;
     float far;
     float tanFov;
-  };
+    float attenuationCoef = 0.005;
+  } resolveUniformParams;
 
-  etna::Sampler perlinSampler;
+  etna::Buffer resolveUniformParamsBuffer;
 
   glm::uvec2 resolution;
   glm::uvec2 downscaledRes;

@@ -1,7 +1,7 @@
 #include "App.hpp"
 
 #include <tracy/Tracy.hpp>
-
+#include "gui/ImGuiRenderer.hpp"
 
 App::App()
 {
@@ -19,7 +19,10 @@ App::App()
 
   renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes/Avocado/Avocado_baked.gltf");
   renderer->initFrameDelivery(std::move(surface), [this]() { return mainWindow->getResolution(); });
+  ImGuiRenderer::enableImGuiForWindow(mainWindow->native());
 
+  mainCam.zFar = 1024.0f;
+  mainCam.zNear = 0.125f;
   mainCam.lookAt({0, 0, 0}, {0, 0, -1}, {0, 1, 0});
 }
 

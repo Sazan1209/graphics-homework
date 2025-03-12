@@ -31,7 +31,8 @@ void main()
   vec2 texCoord = vec2(rand(-2), rand(-1));
 
   float height = imageLoad(heightMap, ivec2(floor(texCoord * vec2(heightMapSize)))).x;
-  height += 5;
+  float heightAdd = rand(20);
+  height += 5 * heightAdd;
 
   vec3 posModel = vec3(texCoord * terrainSize, height).xzy;
 
@@ -39,5 +40,5 @@ void main()
   posWorld.z = -posWorld.z;
   posWorld += centerCoordWorld;
 
-  lights[ind] = PointLight(vec3(rand(1), rand(2), rand(3)), 15.0, posWorld, 0.0);
+  lights[ind] = PointLight(vec3(rand(1), rand(2), rand(3)), 30.0 * rand(20), posWorld, heightAdd);
 }

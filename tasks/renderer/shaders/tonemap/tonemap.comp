@@ -27,9 +27,7 @@ void main()
   // linear interpolation
   if (maxLum / minLum <= maxScreenLum / minScreenLum)
   {
-    const float coef = (lum - minLum) / (maxLum - minLum);
-    const float resLum = mix(minScreenLum, maxScreenLum, coef);
-    pixel = (pixel / lum) * resLum;
+    pixel = (pixel / maxLum);
   }
   else
   {

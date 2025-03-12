@@ -10,7 +10,7 @@
 #include "FramePacket.hpp"
 #include "WorldRenderer.hpp"
 
-
+class ImGuiRenderer;
 using ResolutionProvider = fu2::unique_function<glm::uvec2() const>;
 
 class Renderer
@@ -39,5 +39,6 @@ private:
   bool useVsync = true;
 
   std::unique_ptr<WorldRenderer> worldRenderer;
+  std::unique_ptr<ImGuiRenderer> guiRenderer;
   etna::GpuWorkCount workCount;
 };
