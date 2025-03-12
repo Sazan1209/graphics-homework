@@ -5,7 +5,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 shared vec3 buf[256];
 layout(binding = 0, r11f_g11f_b10f) restrict readonly uniform image2D src;
-layout(binding = 1, r11f_g11f_b10f) restrict uniform image2D dst;
+layout(binding = 1, r11f_g11f_b10f) restrict writeonly uniform image2D dst;
 
 vec3 get(vec2 coord) {
   ivec2 coordI = ivec2(floor(coord));

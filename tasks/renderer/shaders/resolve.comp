@@ -45,7 +45,7 @@ void main()
   float depth = imageLoad(depths, ivec2(gl_GlobalInvocationID.xy)).x;
   if (depth == 1.0)
   {
-    imageStore(albedo, ivec2(gl_GlobalInvocationID.xy), vec4(skyColor, 1.0));
+    imageStore(albedo, ivec2(gl_GlobalInvocationID.xy), vec4(skyColor * sunlight.strength, 1.0));
     return;
   }
 

@@ -267,10 +267,34 @@ bool WorldRenderer::shouldCull(glm::mat4, BoundingBox)
 
 void WorldRenderer::drawGui()
 {
-  ImGui::Begin("test");
-  ImGui::PlotHistogram("Adjusted hist", (float*)tonemapHist.data() + 2, 128);
-  ImGui::Value("Min lum", ((float*)tonemapHist.data())[0]);
-  ImGui::Value("Max lum", ((float*)tonemapHist.data())[1]);
+  ImGui::Begin("Menu");
+  if (ImGui::CollapsingHeader("Tonemapping"))
+  {
+    ImGui::PlotHistogram("Adjusted hist", (float*)tonemapHist.data() + 2, 128);
+    ImGui::Value("Min lum", ((float*)tonemapHist.data())[0]);
+    ImGui::Value("Max lum", ((float*)tonemapHist.data())[1]);
+  }
+  if (ImGui::CollapsingHeader("Lighting"))
+  {
+    ImGui::InputFloat("Attenuation coefficient", &resolveUniformParams.attenuationCoef);
+    ImGui::InputFloat("Specular exponent", &resolveUniformParams.lightExponent);
+    ImGui::InputFloat("Ambient", &resolveUniformParams.sunlight.ambient);
+  }
+  if (ImGui::CollapsingHeader("Sunlight"))
+  {
+    if (ImGui::DragFloat2("Angle", sunlightAngles, 1.0f, -89.0f, 89.0f))
+    {
+      float a0 = glm::radians(sunlightAngles[0]);
+      float a1 = glm::radians(sunlightAngles[1]);
+      float x = glm::sin(a1) * glm::cos(a0);
+      float y = -glm::cos(a0) * glm::cos(a1);
+      float z = -glm::sin(a0) * glm::cos(a1);
+
+      resolveUniformParams.sunlight.dir = glm::normalize(glm::vec3(x, y, z));
+    };
+    ImGui::InputFloat("Strength", &resolveUniformParams.sunlight.strength);
+    ImGui::ColorPicker3("Color", (float*)&resolveUniformParams.sunlight.color);
+  }
   ImGui::End();
 }
 
@@ -452,7 +476,7 @@ void WorldRenderer::renderCube(vk::CommandBuffer cmd_buf)
 
   cmd_buf.pushConstants<glm::mat4>(layout, vk::ShaderStageFlagBits::eVertex, 0, worldViewProj);
 
-  cmd_buf.draw(36, 128, 0, 0);
+  cmd_buf.draw(36, 64, 0, 0);
 }
 
 

@@ -81,6 +81,8 @@ private:
     glm::vec3 eye;
   };
 
+
+  float sunlightAngles[2] = {30.0f, 0.0f};
   struct
   {
     resolve::Sunlight sunlight = {

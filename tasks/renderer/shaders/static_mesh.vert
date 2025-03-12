@@ -18,10 +18,10 @@ layout(std430, binding = 0) restrict readonly buffer matr
   mat4 mModels[];
 };
 
-layout(location = 0) out VS_OUT
+layout(location = 0) out in_vs_out
 {
-  vec3 wPos;
   vec3 wNorm;
+  vec2 texCoord;
 }
 vOut;
 
@@ -30,13 +30,14 @@ out gl_PerVertex
   vec4 gl_Position;
 };
 
-void main(void)
+void main()
 {
-  const vec4 wNorm = vec4(decode_normal(floatBitsToUint(vPosNorm.w)), 0.0f);
+  const vec3 wNorm = decode_normal(floatBitsToUint(vPosNorm.w));
   const mat4 mModel = mModels[gl_InstanceIndex];
 
-  vec3 wPos = (mModel * vec4(vPosNorm.xyz, 1.0f)).xyz;
-  vOut.wNorm = normalize(mat3(transpose(inverse(mModel))) * wNorm.xyz);
+  vOut.wNorm = normalize(mat3(mModel) * wNorm.xyz);
+  vOut.texCoord = vTexCoordAndTang.xy;
 
-  gl_Position = params.mProjView * vec4(vOut.wPos, 1.0);
+  vec3 wPos = (mModel * vec4(vPosNorm.xyz, 1.0f)).xyz;
+  gl_Position = params.mProjView * vec4(wPos, 1.0);
 }

@@ -9,7 +9,7 @@ layout(local_size_x = 32, local_size_y = 32) in;
 shared uint localBuckets[bucketCount];
 
 layout(binding = 0, r11f_g11f_b10f) restrict readonly uniform image2D image;
-layout(binding = 1, std430) buffer A
+layout(binding = 1, std430) coherent buffer A
 {
   float minLum;
   float maxLum;
