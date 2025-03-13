@@ -1,3 +1,4 @@
+add_subdirectory(scene/baker/)
 
 add_executable(complete_renderer
   main.cpp
@@ -5,6 +6,7 @@ add_executable(complete_renderer
   Renderer.cpp
   WorldRenderer.cpp
   TerrainGenerator.cpp
+# StaticMeshRenderer.cpp
 )
 
 target_link_libraries(complete_renderer
