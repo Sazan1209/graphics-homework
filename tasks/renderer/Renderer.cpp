@@ -8,6 +8,8 @@
 #include "gui/ImGuiRenderer.hpp"
 #include <imgui.h>
 
+#include "state_tracking/ResourceStates.hpp"
+
 Renderer::Renderer(glm::uvec2 res)
   : resolution{res}
   , workCount{numFramesInFlight}
@@ -33,6 +35,7 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
     .features = vk::PhysicalDeviceFeatures2{.features = {.tessellationShader = true}},
     .physicalDeviceIndexOverride = {},
     .numFramesInFlight = numFramesInFlight,
+    .generateBarriersAutomatically = false,
   });
 
   worldRenderer = std::make_unique<WorldRenderer>(workCount);
@@ -110,9 +113,15 @@ void Renderer::drawFrame()
 
   auto nextSwapchainImage = window->acquireNext();
 
+
   if (nextSwapchainImage)
   {
     auto [image, view, availableSem] = *nextSwapchainImage;
+    my_etna::get_resource_tracker().setExternalTextureState(
+      image,
+      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+      vk::AccessFlagBits2::eNone,
+      vk::ImageLayout::eUndefined);
 
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
@@ -120,21 +129,31 @@ void Renderer::drawFrame()
 
       worldRenderer->renderWorld(currentCmdBuf, image);
 
+      my_etna::set_state(
+        currentCmdBuf,
+        image,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageAspectFlagBits::eColor);
+
+      my_etna::flush_barriers(currentCmdBuf);
+
       {
         ImDrawData* pDrawData = ImGui::GetDrawData();
         guiRenderer->render(
           currentCmdBuf, {{0, 0}, {resolution.x, resolution.y}}, image, view, pDrawData);
       }
 
-      etna::set_state(
+      my_etna::set_state(
         currentCmdBuf,
         image,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        {},
+        vk::PipelineStageFlagBits2::eAllCommands,
+        vk::AccessFlagBits2::eNone,
         vk::ImageLayout::ePresentSrcKHR,
         vk::ImageAspectFlagBits::eColor);
 
-      etna::flush_barriers(currentCmdBuf);
+      my_etna::flush_barriers(currentCmdBuf);
 
       ETNA_READ_BACK_GPU_PROFILING(currentCmdBuf);
     }

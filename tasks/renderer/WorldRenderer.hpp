@@ -53,7 +53,7 @@ private:
   {
     etna::Image color;
     etna::Image normal;
-    etna::Image depthStencil;
+    etna::Image depth;
   } gBuffer;
 
   etna::Image tonemapDownscaledImage;

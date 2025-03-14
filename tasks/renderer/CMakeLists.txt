@@ -6,6 +6,7 @@ add_executable(complete_renderer
   Renderer.cpp
   WorldRenderer.cpp
   TerrainGenerator.cpp
+  state_tracking/ResourceStates.cpp
 # StaticMeshRenderer.cpp
 )
 

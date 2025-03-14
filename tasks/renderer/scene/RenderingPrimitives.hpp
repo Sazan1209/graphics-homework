@@ -7,6 +7,10 @@ struct BoundingBox
   std::array<float, 3> posMin;
 };
 
+// struct Material
+// {
+// };
+
 struct RenderElement
 {
   std::uint32_t vertexOffset;
@@ -15,21 +19,26 @@ struct RenderElement
   std::uint32_t indexCount;
 
   BoundingBox box;
+  // Material
 };
 
-struct REInstance{
+struct REInstance
+{
   std::uint32_t matrixPos;
-  std::uint32_t materialPos;
+  std::uint32_t relemPos;
 };
 
-struct REGroup{
+struct InstancedRE
+{
   RenderElement element;
   std::uint32_t firstInstance;
   std::uint32_t instanceCount;
 };
 
-struct Material{
-
+struct SingleRE
+{
+  RenderElement element;
+  std::uint32_t matrixPos;
 };
 
 struct Mesh
