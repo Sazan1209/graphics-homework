@@ -28,7 +28,6 @@ void Baker::bakeScene(std::filesystem::path path, std::filesystem::path output)
   auto model = std::move(*maybeModel);
   auto [verts, inds, relems, meshes] = processMeshes(model);
 
-
   model.extensionsRequired.push_back("KHR_mesh_quantization");
   model.extensionsUsed.push_back("KHR_mesh_quantization");
   if (model.buffers.size() != 1)
@@ -147,8 +146,11 @@ void Baker::bakeScene(std::filesystem::path path, std::filesystem::path output)
 
   std::filesystem::create_directory(output);
 
-  loader.WriteGltfSceneToFile(
-    &model, (output / path.stem() += "_baked.gltf").string(), false, false, true, false);
+  if (!loader.WriteGltfSceneToFile(
+        &model, (output / path.stem() += "_baked.gltf").string(), false, false, true, false))
+  {
+    spdlog::error("Failed to write gltf");
+  };
 }
 
 std::optional<tinygltf::Model> Baker::loadModel(std::filesystem::path path)

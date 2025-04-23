@@ -1,4 +1,5 @@
 add_subdirectory(scene/baker/)
+add_subdirectory(scene/scene_manager/)
 
 add_executable(complete_renderer
   main.cpp

@@ -10,7 +10,7 @@
 #include <etna/VertexInput.hpp>
 
 #include <stb_image.h>
-#include "../RenderingPrimitives.hpp"
+#include "RenderingPrimitives.hpp"
 
 class Baker
 {
@@ -31,6 +31,13 @@ private:
   };
 
   static_assert(sizeof(Vertex) == sizeof(float) * 8);
+
+  struct Mesh
+  {
+    std::uint32_t firstRelem;
+    std::uint32_t relemCount;
+  };
+
 
   struct ProcessedMeshes
   {
