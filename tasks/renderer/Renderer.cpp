@@ -38,7 +38,7 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
     .generateBarriersAutomatically = false,
   });
 
-  worldRenderer = std::make_unique<WorldRenderer>(workCount);
+  worldRenderer = std::make_unique<WorldRenderer>();
 }
 
 void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvider res_provider)

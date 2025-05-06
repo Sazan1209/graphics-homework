@@ -31,7 +31,7 @@ struct RenderElement
 struct REInstance
 {
   std::uint32_t matrixPos;
-  std::uint32_t relemPos;
+  std::uint32_t groupPos;
 };
 
 struct InstancedRE
@@ -57,10 +57,20 @@ struct Vertex
 
 static_assert(sizeof(Vertex) == sizeof(float) * 8);
 
-struct SceneData{
+struct SceneData
+{
   std::vector<unsigned char> vertIndBuffer;
-  std::span<const Vertex> vertexData;
-  std::span<const uint32_t> indices;
+  size_t indexOffset;
+  std::span<const std::byte> getIndices()
+  {
+    return {
+      reinterpret_cast<std::byte*>(vertIndBuffer.data() + indexOffset),
+      vertIndBuffer.size() - indexOffset};
+  };
+  std::span<const std::byte> getVertexData()
+  {
+    return {reinterpret_cast<std::byte*>(vertIndBuffer.data()), indexOffset};
+  };
   std::vector<SingleRE> singleRelems;
   std::vector<InstancedRE> groupedRelems;
   std::vector<REInstance> groupedRelemsInstances;

@@ -7,7 +7,7 @@
 #include <glm/glm.hpp>
 #include <tiny_gltf.h>
 
-#include "RenderingPrimitives.hpp"
+#include "../RenderingPrimitives.hpp"
 
 class SceneLoader
 {
@@ -34,8 +34,7 @@ private:
   struct ProcessedMeshes
   {
     std::vector<unsigned char> vertIndBuffer;
-    std::span<const Vertex> vertices;
-    std::span<const std::uint32_t> indices;
+    size_t indexOffset;
     std::vector<RenderElement> relems;
     std::vector<Mesh> meshes;
   };

@@ -1,0 +1,47 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "static.h"
+#include "../utils.glsl"
+
+layout(local_size_x = 32) in;
+
+layout(binding = 0, std430) restrict coherent buffer cullgroup_buf_0
+{
+  GroupREIndirectCommand comms[];
+};
+
+layout(binding = 1, std430) readonly restrict buffer cullgroup_buf_1
+{
+  mat4 matricesWfM[];
+};
+
+layout(binding = 2, std430) writeonly restrict buffer cullgroup_buf_2
+{
+  uint matrixIndices[];
+};
+
+layout(binding = 3, std430) readonly restrict buffer cullgroup_buf_3
+{
+  REInstanceCullingInfo info[];
+};
+
+layout(push_constant) uniform cullsingle_pc
+{
+  mat4 matrixVfW;
+};
+
+void main(){
+  uint ind = gl_GlobalInvocationID.x;
+  if (ind >= info.length()){
+    return;
+  }
+  uint commInd = info[ind].commandIndex;
+  mat4 matrixWfM = matricesWfM[info[ind].matrWfMIndex];
+  bool shouldCull = !Cull(comms[commInd].min_coord, comms[commInd].max_coord, matrixVfW * matrixWfM);
+  if (!shouldCull){
+    return;
+  }
+  uint writeInd = atomicAdd(comms[commInd].command.instanceCount, 1);
+  matrixIndices[writeInd] = info[ind].matrWfMIndex;
+}

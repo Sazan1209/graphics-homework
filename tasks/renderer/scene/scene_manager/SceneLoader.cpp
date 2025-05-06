@@ -59,7 +59,7 @@ std::optional<SceneData> SceneLoader::selectScene(std::filesystem::path path)
   // Resolve node transforms
   auto [transforms, instMeshes] = processInstances(model);
   // Unpack vertex data and relems
-  auto [vertIndBuffer, vertexData, indices, relems, meshs] = processMeshes(model);
+  auto [vertIndBuffer, indexOffset, relems, meshs] = processMeshes(model);
 
   // Group repeating relems and separete the non-repeating ones
   auto [groupedRelemsInstances, groupedRelems, singleRelems] =
@@ -68,8 +68,7 @@ std::optional<SceneData> SceneLoader::selectScene(std::filesystem::path path)
 
   return SceneData{
     .vertIndBuffer = std::move(vertIndBuffer),
-    .vertexData = vertexData,
-    .indices = indices,
+    .indexOffset = indexOffset,
     .singleRelems = std::move(singleRelems),
     .groupedRelems = std::move(groupedRelems),
     .groupedRelemsInstances = std::move(groupedRelemsInstances),
@@ -189,7 +188,7 @@ SceneLoader::ProcessedMeshes SceneLoader::processMeshes(const tinygltf::Model& m
       BoundingBox box;
 
       std::copy(pos_accessor.maxValues.begin(), pos_accessor.maxValues.end(), box.posMax.begin());
-      std::copy(pos_accessor.minValues.begin(), pos_accessor.minValues.end(), box.posMax.begin());
+      std::copy(pos_accessor.minValues.begin(), pos_accessor.minValues.end(), box.posMin.begin());
 
       result.relems.push_back(RenderElement{
         .vertexOffset = static_cast<std::uint32_t>(pos_accessor.byteOffset / sizeof(Vertex)),
@@ -202,13 +201,7 @@ SceneLoader::ProcessedMeshes SceneLoader::processMeshes(const tinygltf::Model& m
   }
 
   {
-    auto ptr = model.buffers[0].data.data();
-    auto vertex_count = model.bufferViews[0].byteLength / sizeof(Vertex);
-    auto index_count = model.bufferViews[1].byteLength / sizeof(uint32_t);
-    auto vertexPtr = reinterpret_cast<const Vertex*>(ptr);
-    auto indexPtr = reinterpret_cast<const uint32_t*>(ptr + vertex_count * sizeof(Vertex));
-    result.indices = {indexPtr, index_count};
-    result.vertices = {vertexPtr, vertex_count};
+    result.indexOffset = model.bufferViews[0].byteLength;
     result.vertIndBuffer = std::move(model.buffers[0].data);
   }
 
@@ -267,6 +260,7 @@ SceneLoader::ProcessedGroups SceneLoader::processGroups(
 
   // Group remaining relems
   std::vector<InstancedRE> relemGroups;
+  std::vector<uint32_t> groupInds(relems.size());
   relemGroups.reserve(relems.size() - singleRelemCount);
   if (relemUseCounts[0] != 0)
   {
@@ -275,11 +269,13 @@ SceneLoader::ProcessedGroups SceneLoader::processGroups(
       .firstInstance = 0,
       .instanceCount = static_cast<uint32_t>(relemUseCounts[0]),
     });
+    groupInds[0] = 0;
   }
   for (size_t i = 1; i < relemUseCounts.size(); ++i)
   {
     if (relemUseCounts[i] != 0)
     {
+      groupInds[i] = relemGroups.size();
       relemGroups.push_back(InstancedRE{
         .element = relems[i],
         .firstInstance = static_cast<uint32_t>(relemUseCounts[i - 1]),
@@ -296,7 +292,7 @@ SceneLoader::ProcessedGroups SceneLoader::processGroups(
     }
     REInstance curr = {
       .matrixPos = static_cast<uint32_t>(meshInd),
-      .relemPos = static_cast<uint32_t>(relemInd),
+      .groupPos = groupInds[relemInd],
     };
     instances[--relemUseCounts[relemInd]] = curr;
   });
