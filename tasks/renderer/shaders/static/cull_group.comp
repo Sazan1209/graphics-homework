@@ -38,8 +38,8 @@ void main(){
   }
   uint commInd = info[ind].commandIndex;
   mat4 matrixWfM = matricesWfM[info[ind].matrWfMIndex];
-  bool shouldCull = !Cull(comms[commInd].min_coord, comms[commInd].max_coord, matrixVfW * matrixWfM);
-  if (!shouldCull){
+  bool shouldCull = Cull(comms[commInd].min_coord, comms[commInd].max_coord, matrixVfW * matrixWfM);
+  if (shouldCull){
     return;
   }
   uint writeInd = atomicAdd(comms[commInd].command.instanceCount, 1);

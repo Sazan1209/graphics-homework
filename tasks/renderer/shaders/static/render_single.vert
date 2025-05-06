@@ -1,4 +1,4 @@
-#version 450
+#version 460
 #extension GL_GOOGLE_include_directive : require
 #include "static.h"
 #include "unpack_attributes_baked.glsl"
@@ -11,7 +11,7 @@ layout(std430, binding = 0) readonly restrict buffer rendersingle_buf_0 {
   SingleREIndirectCommand comms[];
 };
 
-layout(std430, binding = 0) readonly restrict buffer rendersingle_buf_1 {
+layout(std430, binding = 1) readonly restrict buffer rendersingle_buf_1 {
   mat4 matricesWfM[];
 };
 
@@ -31,7 +31,7 @@ out gl_PerVertex
 
 void main(){
   const vec4 mNorm = vec4(decode_normal(floatBitsToUint(mPosNorm.w)), 0.0f);
-  const mat4 matrWfM = matricesWfM[comms[gl_InstanceIndex].matrWfMIndex];
+  const mat4 matrWfM = matricesWfM[comms[gl_DrawID].matrWfMIndex];
   wNorm = (matrWfM * mNorm).xyz;
   gl_Position = matrVfW * matrWfM * vec4(mPosNorm.xyz, 1.0f);
 }

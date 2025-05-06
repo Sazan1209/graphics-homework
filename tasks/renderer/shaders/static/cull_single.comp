@@ -30,6 +30,6 @@ void main()
     return;
   }
   mat4 matrixWfM = matricesWfM[comms[ind].matrWfMIndex];
-  bool shouldCull = !Cull(comms[ind].min_coord, comms[ind].max_coord, matrixVfW * matrixWfM);
+  bool shouldCull = Cull(comms[ind].min_coord, comms[ind].max_coord, matrixVfW * matrixWfM);
   comms[ind].command.instanceCount = shouldCull ? 0 : 1;
 }
