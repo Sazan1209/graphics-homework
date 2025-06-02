@@ -17,10 +17,13 @@ public:
   void setupPipelines();
 
   void update(glm::mat4 matrVfW_) { matrVfW = matrVfW_; }
+
   void prepareForRender(vk::CommandBuffer cmd_buf);
   void renderScene(vk::CommandBuffer cmd_buf);
 
 private:
+  vk::DescriptorSet textures;
+
   etna::Buffer vertexData;
   etna::Buffer indexData;
 

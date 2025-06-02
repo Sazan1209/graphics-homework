@@ -8,8 +8,6 @@
 #include "gui/ImGuiRenderer.hpp"
 #include <imgui.h>
 
-#include "state_tracking/ResourceStates.hpp"
-
 Renderer::Renderer(glm::uvec2 res)
   : resolution{res}
   , workCount{numFramesInFlight}
@@ -119,11 +117,11 @@ void Renderer::drawFrame()
   if (nextSwapchainImage)
   {
     auto [image, view, availableSem] = *nextSwapchainImage;
-    my_etna::get_resource_tracker().setExternalTextureState(
-      image,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-      vk::AccessFlagBits2::eNone,
-      vk::ImageLayout::eUndefined);
+    // etna::get_context().getResourceTracker().setExternalTextureState(
+    //   image,
+    //   vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    //   vk::AccessFlagBits2::eNone,
+    //   vk::ImageLayout::eUndefined);
 
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
@@ -131,7 +129,7 @@ void Renderer::drawFrame()
 
       worldRenderer->renderWorld(currentCmdBuf, image);
 
-      my_etna::set_state(
+      etna::set_state(
         currentCmdBuf,
         image,
         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -139,7 +137,7 @@ void Renderer::drawFrame()
         vk::ImageLayout::eColorAttachmentOptimal,
         vk::ImageAspectFlagBits::eColor);
 
-      my_etna::flush_barriers(currentCmdBuf);
+      etna::flush_barriers(currentCmdBuf);
 
       {
         ImDrawData* pDrawData = ImGui::GetDrawData();
@@ -147,7 +145,7 @@ void Renderer::drawFrame()
           currentCmdBuf, {{0, 0}, {resolution.x, resolution.y}}, image, view, pDrawData);
       }
 
-      my_etna::set_state(
+      etna::set_state(
         currentCmdBuf,
         image,
         vk::PipelineStageFlagBits2::eAllCommands,
@@ -155,7 +153,7 @@ void Renderer::drawFrame()
         vk::ImageLayout::ePresentSrcKHR,
         vk::ImageAspectFlagBits::eColor);
 
-      my_etna::flush_barriers(currentCmdBuf);
+      etna::flush_barriers(currentCmdBuf);
 
       ETNA_READ_BACK_GPU_PROFILING(currentCmdBuf);
     }

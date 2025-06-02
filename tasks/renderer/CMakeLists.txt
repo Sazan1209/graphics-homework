@@ -8,8 +8,6 @@ add_executable(complete_renderer
   WorldRenderer.cpp
   StaticMeshRenderer.cpp
   TerrainGenerator.cpp
-  state_tracking/ResourceStates.cpp
-# StaticMeshRenderer.cpp
 )
 
 target_link_libraries(complete_renderer

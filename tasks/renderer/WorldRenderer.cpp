@@ -10,7 +10,6 @@
 #include "shaders/terrain/terrain.h"
 #include "TerrainGenerator.hpp"
 #include <imgui.h>
-#include "state_tracking/ResourceStates.hpp"
 
 void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 {
@@ -246,14 +245,14 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
   staticRenderer.prepareForRender(cmd_buf);
   {
     ETNA_PROFILE_GPU(cmd_buf, renderForward);
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       gBuffer.normal.get(),
       vk::PipelineStageFlagBits2::eColorAttachmentOutput,
       vk::AccessFlagBits2::eColorAttachmentWrite,
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ImageAspectFlagBits::eColor);
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       gBuffer.color.get(),
       vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -261,7 +260,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
       vk::ImageLayout::eColorAttachmentOptimal,
       vk::ImageAspectFlagBits::eColor);
 
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       gBuffer.depth.get(),
       vk::PipelineStageFlagBits2::eEarlyFragmentTests |
@@ -269,7 +268,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
       vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
       vk::ImageLayout::eDepthAttachmentOptimal,
       vk::ImageAspectFlagBits::eDepth);
-    my_etna::flush_barriers(cmd_buf);
+    etna::flush_barriers(cmd_buf);
 
     etna::RenderTargetState renderTargets(
       cmd_buf,
@@ -287,7 +286,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
 
   tonemap(cmd_buf);
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     gBuffer.color.get(),
     vk::PipelineStageFlagBits2::eBlit,
@@ -295,7 +294,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
     vk::ImageLayout::eTransferSrcOptimal,
     vk::ImageAspectFlagBits::eColor);
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     target_image,
     vk::PipelineStageFlagBits2::eBlit,
@@ -303,7 +302,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
     vk::ImageLayout::eTransferDstOptimal,
     vk::ImageAspectFlagBits::eColor);
 
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   std::array offsets = {
     vk::Offset3D{},
@@ -388,28 +387,28 @@ void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
     resolveUniformParamsBuffer.data(), &resolveUniformParams, sizeof(resolveUniformParams));
 
   auto info = etna::get_shader_program("resolve");
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     gBuffer.color.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     gBuffer.depth.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eDepth);
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     gBuffer.normal.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   auto binding0 = gBuffer.color.genBinding({}, vk::ImageLayout::eGeneral, {});
   auto binding1 = gBuffer.depth.genBinding({}, vk::ImageLayout::eGeneral, {});
@@ -445,30 +444,30 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
 
   // Possibly transfer layout for imageDownscaled
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapHist.get(),
     vk::PipelineStageFlagBits2::eTransfer,
     vk::AccessFlagBits2::eTransferWrite);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   cmd_buf.fillBuffer(tonemapHist.get(), 0, VK_WHOLE_SIZE, 0);
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     gBuffer.color.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapDownscaledImage.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   {
     auto info = etna::get_shader_program("tonemap_downscale");
@@ -494,20 +493,20 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     cmd_buf.dispatch(downscaledRes.x, downscaledRes.y, 1);
   }
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapDownscaledImage.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapHist.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead);
 
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   {
     auto info = etna::get_shader_program("tonemap_minmax");
@@ -533,13 +532,13 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     cmd_buf.dispatch((downscaledRes.x + 31) / 32, (downscaledRes.y + 31) / 32, 1);
   }
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapHist.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead,
     ForceSetState::eTrue);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   {
     auto histInfo = etna::get_shader_program("tonemap_hist");
@@ -565,13 +564,13 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     cmd_buf.dispatch((downscaledRes.x + 31) / 32, (downscaledRes.y + 31) / 32, 1);
   }
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapHist.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead,
     ForceSetState::eTrue);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   {
     auto info = etna::get_shader_program("tonemap_equalize");
@@ -595,13 +594,13 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     cmd_buf.dispatch(1, 1, 1);
   }
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapHist.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead,
     ForceSetState::eTrue);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   {
     auto cumsumInfo = etna::get_shader_program("tonemap_cumsum");
@@ -625,20 +624,20 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
     cmd_buf.dispatch(1, 1, 1); // beautiful
   }
 
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     tonemapHist.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead,
     ForceSetState::eTrue);
-  my_etna::set_state(
+  etna::set_state(
     cmd_buf,
     gBuffer.color.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageRead,
     vk::ImageLayout::eGeneral,
     vk::ImageAspectFlagBits::eColor);
-  my_etna::flush_barriers(cmd_buf);
+  etna::flush_barriers(cmd_buf);
 
   {
     auto tonemapInfo = etna::get_shader_program("tonemap");

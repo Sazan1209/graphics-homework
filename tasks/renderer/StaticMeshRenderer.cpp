@@ -6,13 +6,13 @@
 #include <etna/PipelineManager.hpp>
 #include <etna/Profiling.hpp>
 #include "shaders/static/static.h"
-#include "state_tracking/ResourceStates.hpp"
 
 // Maybe these should just be one class, but I think it's more neat otherwise
 static_assert(sizeof(REInstance) == sizeof(REInstanceCullingInfo));
 
 void StaticMeshRenderer::loadScene(std::filesystem::path path)
 {
+  ZoneScopedN("loadStaticData");
   SceneLoader loader;
   auto maybeSceneDesc = loader.selectScene(path);
   if (!maybeSceneDesc)
@@ -21,123 +21,129 @@ void StaticMeshRenderer::loadScene(std::filesystem::path path)
     std::exit(1);
   }
   SceneData sceneDesc = std::move(*maybeSceneDesc);
-  etna::BlockingTransferHelper transfer(etna::BlockingTransferHelper::CreateInfo{
-    .stagingSize = sceneDesc.getVertexData().size_bytes(),
-  });
-  std::unique_ptr<etna::OneShotCmdMgr> mgr = etna::get_context().createOneShotCmdMgr();
-
-  singleRelemCount = sceneDesc.singleRelems.size();
-  groupRelemCount = sceneDesc.groupedRelems.size();
-  groupRelemInstanceCount = sceneDesc.groupedRelemsInstances.size();
-
-  vertexDesc = sceneDesc.vertexDesc;
-
-  auto& ctx = etna::get_context();
-
-  relemMtWTransforms = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = sceneDesc.transforms.size() * sizeof(glm::mat4),
-    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-    .name = "SM_Matrices",
-  });
-  transfer.uploadBuffer(
-    *mgr, relemMtWTransforms, 0, std::span<const glm::mat4>(sceneDesc.transforms));
-
-  if (singleRelemCount != 0)
   {
-    std::vector<SingleREIndirectCommand> tmp(sceneDesc.singleRelems.size());
-    singleRelemData = ctx.createBuffer(etna::Buffer::CreateInfo{
-      .size = sceneDesc.singleRelems.size() * sizeof(SingleREIndirectCommand),
-      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer |
-        vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
-      .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-      .name = "SM_SingleRelemDrawcalls",
+    ZoneScopedN("transferStaticData");
+    etna::BlockingTransferHelper transfer(etna::BlockingTransferHelper::CreateInfo{
+      .stagingSize = sceneDesc.getVertexData().size_bytes(),
     });
+    std::unique_ptr<etna::OneShotCmdMgr> mgr = etna::get_context().createOneShotCmdMgr();
 
-    for (size_t i = 0; i < sceneDesc.singleRelems.size(); ++i)
-    {
-      auto& src = sceneDesc.singleRelems[i];
-      auto& dst = tmp[i];
-      dst.command = {
-        .indexCount = src.element.indexCount,
-        .instanceCount = 0,
-        .firstIndex = src.element.indexOffset,
-        .vertexOffset = static_cast<int32_t>(src.element.vertexOffset),
-        .firstInstance = static_cast<uint32_t>(i),
-      };
-      for (size_t i = 0; i < 3; ++i)
-      {
-        dst.max_coord[i] = src.element.box.posMax[i];
-        dst.min_coord[i] = src.element.box.posMin[i];
-      }
-      dst.matrWfMIndex = src.matrixPos;
-    }
-    transfer.uploadBuffer(*mgr, singleRelemData, 0, std::span<const SingleREIndirectCommand>(tmp));
-  }
-  if (groupRelemCount != 0)
-  {
-    std::vector<GroupREIndirectCommand> tmp(sceneDesc.groupedRelems.size());
-    drawCallsGRE = ctx.createBuffer(etna::Buffer::CreateInfo{
-      .size = sceneDesc.groupedRelems.size() * sizeof(GroupREIndirectCommand),
-      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer |
-        vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
-      .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-      .name = "SM_GroupRelemDrawcalls",
-    });
+    singleRelemCount = sceneDesc.singleRelems.size();
+    groupRelemCount = sceneDesc.groupedRelems.size();
+    groupRelemInstanceCount = sceneDesc.groupedRelemsInstances.size();
 
-    for (size_t i = 0; i < sceneDesc.groupedRelems.size(); ++i)
-    {
-      auto& src = sceneDesc.groupedRelems[i];
-      auto& dst = tmp[i];
-      dst.command = {
-        .indexCount = src.element.indexCount,
-        .instanceCount = 0, // Instance count is calculated during runtime
-        .firstIndex = src.element.indexOffset,
-        .vertexOffset = static_cast<int32_t>(src.element.vertexOffset),
-        .firstInstance = src.firstInstance,
-      };
-      for (size_t i = 0; i < 3; ++i)
-      {
-        dst.max_coord[i] = src.element.box.posMax[i];
-        dst.min_coord[i] = src.element.box.posMin[i];
-      }
-    }
-    transfer.uploadBuffer(*mgr, drawCallsGRE, 0, std::span<const GroupREIndirectCommand>(tmp));
+    vertexDesc = sceneDesc.vertexDesc;
 
-    cullingInfoGRE = ctx.createBuffer(etna::Buffer::CreateInfo{
-      .size = sceneDesc.groupedRelemsInstances.size() * sizeof(REInstanceCullingInfo),
+    auto& ctx = etna::get_context();
+
+    relemMtWTransforms = ctx.createBuffer(etna::Buffer::CreateInfo{
+      .size = sceneDesc.transforms.size() * sizeof(glm::mat4),
       .bufferUsage =
         vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
       .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-      .name = "SM_InstanceCullingInfoDrawcalls",
+      .name = "SM_Matrices",
     });
     transfer.uploadBuffer(
-      *mgr, cullingInfoGRE, 0, std::span<const REInstance>(sceneDesc.groupedRelemsInstances));
+      *mgr, relemMtWTransforms, 0, std::span<const glm::mat4>(sceneDesc.transforms));
 
-    renderInfoGRE = ctx.createBuffer(etna::Buffer::CreateInfo{
-      .size = sceneDesc.groupedRelemsInstances.size() * sizeof(REInstanceCullingInfo),
-      .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+    if (singleRelemCount != 0)
+    {
+      std::vector<SingleREIndirectCommand> tmp(sceneDesc.singleRelems.size());
+      singleRelemData = ctx.createBuffer(etna::Buffer::CreateInfo{
+        .size = sceneDesc.singleRelems.size() * sizeof(SingleREIndirectCommand),
+        .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .name = "SM_SingleRelemDrawcalls",
+      });
+
+      for (size_t i = 0; i < sceneDesc.singleRelems.size(); ++i)
+      {
+        auto& src = sceneDesc.singleRelems[i];
+        auto& dst = tmp[i];
+        dst.command = {
+          .indexCount = src.element.indexCount,
+          .instanceCount = 0,
+          .firstIndex = src.element.indexOffset,
+          .vertexOffset = static_cast<int32_t>(src.element.vertexOffset),
+          .firstInstance = static_cast<uint32_t>(i),
+        };
+        for (size_t i = 0; i < 3; ++i)
+        {
+          dst.max_coord[i] = src.element.box.posMax[i];
+          dst.min_coord[i] = src.element.box.posMin[i];
+        }
+        dst.matrWfMIndex = src.matrixPos;
+      }
+      transfer.uploadBuffer(
+        *mgr, singleRelemData, 0, std::span<const SingleREIndirectCommand>(tmp));
+    }
+    if (groupRelemCount != 0)
+    {
+      std::vector<GroupREIndirectCommand> tmp(sceneDesc.groupedRelems.size());
+      drawCallsGRE = ctx.createBuffer(etna::Buffer::CreateInfo{
+        .size = sceneDesc.groupedRelems.size() * sizeof(GroupREIndirectCommand),
+        .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .name = "SM_GroupRelemDrawcalls",
+      });
+
+      for (size_t i = 0; i < sceneDesc.groupedRelems.size(); ++i)
+      {
+        auto& src = sceneDesc.groupedRelems[i];
+        auto& dst = tmp[i];
+        dst.command = {
+          .indexCount = src.element.indexCount,
+          .instanceCount = 0, // Instance count is calculated during runtime
+          .firstIndex = src.element.indexOffset,
+          .vertexOffset = static_cast<int32_t>(src.element.vertexOffset),
+          .firstInstance = src.firstInstance,
+        };
+        for (size_t i = 0; i < 3; ++i)
+        {
+          dst.max_coord[i] = src.element.box.posMax[i];
+          dst.min_coord[i] = src.element.box.posMin[i];
+        }
+      }
+      transfer.uploadBuffer(*mgr, drawCallsGRE, 0, std::span<const GroupREIndirectCommand>(tmp));
+
+      cullingInfoGRE = ctx.createBuffer(etna::Buffer::CreateInfo{
+        .size = sceneDesc.groupedRelemsInstances.size() * sizeof(REInstanceCullingInfo),
+        .bufferUsage =
+          vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .name = "SM_InstanceCullingInfoDrawcalls",
+      });
+      transfer.uploadBuffer(
+        *mgr, cullingInfoGRE, 0, std::span<const REInstance>(sceneDesc.groupedRelemsInstances));
+
+      renderInfoGRE = ctx.createBuffer(etna::Buffer::CreateInfo{
+        .size = sceneDesc.groupedRelemsInstances.size() * sizeof(REInstanceCullingInfo),
+        .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
+        .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .name = "SM_InstanceRenderInfoDrawcalls",
+      });
+    }
+    vertexData = ctx.createBuffer(etna::Buffer::CreateInfo{
+      .size = sceneDesc.getVertexData().size_bytes(),
+      .bufferUsage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
       .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-      .name = "SM_InstanceRenderInfoDrawcalls",
-    });
-  }
-  vertexData = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = sceneDesc.getVertexData().size_bytes(),
-    .bufferUsage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-    .name = "SM_VertexData"});
-  transfer.uploadBuffer(*mgr, vertexData, 0, sceneDesc.getVertexData());
+      .name = "SM_VertexData"});
+    transfer.uploadBuffer(*mgr, vertexData, 0, sceneDesc.getVertexData());
 
-  indexData = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = sceneDesc.getIndices().size_bytes(),
-    .bufferUsage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-    .name = "SM_VertexData"});
-  transfer.uploadBuffer(*mgr, indexData, 0, sceneDesc.getIndices());
+    indexData = ctx.createBuffer(etna::Buffer::CreateInfo{
+      .size = sceneDesc.getIndices().size_bytes(),
+      .bufferUsage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+      .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+      .name = "SM_VertexData"});
+    transfer.uploadBuffer(*mgr, indexData, 0, sceneDesc.getIndices());
+  }
 }
 
 void StaticMeshRenderer::loadShaders()
 {
+  ZoneScoped;
   etna::create_program(
     "reset_group_comms", {COMPLETE_RENDERER_SHADERS_ROOT "reset_group_comms.comp.spv"});
   etna::create_program(
@@ -154,6 +160,7 @@ void StaticMeshRenderer::loadShaders()
 
 void StaticMeshRenderer::setupPipelines()
 {
+  ZoneScoped;
   auto& pipelineManager = etna::get_context().getPipelineManager();
   etna::VertexShaderInputDescription sceneVertexInputDesc{
     .bindings = {etna::VertexShaderInputDescription::Binding{
@@ -231,6 +238,7 @@ void StaticMeshRenderer::setupPipelines()
 
 void StaticMeshRenderer::renderScene(vk::CommandBuffer cmd_buf)
 {
+  ETNA_PROFILE_GPU(cmd_buf, renderStatic);
   if (singleRelemCount != 0)
   {
     auto info = etna::get_shader_program("single_sm_render");
@@ -295,12 +303,12 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
   {
     ETNA_PROFILE_GPU(cmd_buf, cull_single);
 
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       singleRelemData.get(),
       vk::PipelineStageFlagBits2::eComputeShader,
       vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead);
-    my_etna::flush_barriers(cmd_buf);
+    etna::flush_barriers(cmd_buf);
 
     auto info = etna::get_shader_program("cull_single");
     auto binding0 = singleRelemData.genBinding();
@@ -322,7 +330,7 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
     cmd_buf.pushConstants<glm::mat4>(
       pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, {matrVfW});
     cmd_buf.dispatch((singleRelemCount + 31) / 32, 1, 1);
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       singleRelemData.get(),
       vk::PipelineStageFlagBits2::eDrawIndirect | vk::PipelineStageFlagBits2::eVertexShader,
@@ -331,12 +339,12 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
   if (groupRelemInstanceCount != 0)
   {
     ETNA_PROFILE_GPU(cmd_buf, cull_group);
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       drawCallsGRE.get(),
       vk::PipelineStageFlagBits2::eComputeShader,
       vk::AccessFlagBits2::eShaderStorageWrite);
-    my_etna::flush_barriers(cmd_buf);
+    etna::flush_barriers(cmd_buf);
     {
       auto info = etna::get_shader_program("reset_group_comms");
       auto binding0 = drawCallsGRE.genBinding();
@@ -354,17 +362,17 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
         vk::PipelineBindPoint::eCompute, pipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
       cmd_buf.dispatch((groupRelemCount + 31) / 32, 1, 1);
     }
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       drawCallsGRE.get(),
       vk::PipelineStageFlagBits2::eComputeShader,
       vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eShaderStorageRead);
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       renderInfoGRE.get(),
       vk::PipelineStageFlagBits2::eComputeShader,
       vk::AccessFlagBits2::eShaderStorageWrite);
-    my_etna::flush_barriers(cmd_buf);
+    etna::flush_barriers(cmd_buf);
     {
       auto info = etna::get_shader_program("cull_group");
       auto binding0 = drawCallsGRE.genBinding();
@@ -390,12 +398,12 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
         pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, {matrVfW});
       cmd_buf.dispatch((groupRelemInstanceCount + 31) / 32, 1, 1);
     }
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       drawCallsGRE.get(),
       vk::PipelineStageFlagBits2::eDrawIndirect,
       vk::AccessFlagBits2::eIndirectCommandRead);
-    my_etna::set_state(
+    etna::set_state(
       cmd_buf,
       renderInfoGRE.get(),
       vk::PipelineStageFlagBits2::eVertexShader,

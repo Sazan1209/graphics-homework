@@ -50,13 +50,6 @@ CPMAddPackage(
     "TINYGLTF_INSTALL OFF"
 )
 
-# etna -- our wrapper around Vulkan to make life easier
-CPMAddPackage(
-  NAME etna
-  GITHUB_REPOSITORY AlexandrShcherbakov/etna
-  VERSION 1.9.0
-)
-
 # Type-erased function containers that actually work
 CPMAddPackage(
   GITHUB_REPOSITORY Naios/function2
