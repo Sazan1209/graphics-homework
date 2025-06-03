@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <etna/VertexInput.hpp>
 #include <glm/glm.hpp>
+#include <etna/Buffer.hpp>
+#include <etna/Image.hpp>
 
 struct BoundingBox
 {
@@ -59,18 +61,11 @@ static_assert(sizeof(Vertex) == sizeof(float) * 8);
 
 struct SceneData
 {
-  std::vector<unsigned char> vertIndBuffer;
-  size_t indexOffset;
-  std::span<const std::byte> getIndices()
-  {
-    return {
-      reinterpret_cast<std::byte*>(vertIndBuffer.data() + indexOffset),
-      vertIndBuffer.size() - indexOffset};
-  };
-  std::span<const std::byte> getVertexData()
-  {
-    return {reinterpret_cast<std::byte*>(vertIndBuffer.data()), indexOffset};
-  };
+  // GPU-only data
+  etna::Buffer vertexData;
+  etna::Buffer indexData;
+  std::vector<etna::Image> textures;
+
   std::vector<SingleRE> singleRelems;
   std::vector<InstancedRE> groupedRelems;
   std::vector<REInstance> groupedRelemsInstances;

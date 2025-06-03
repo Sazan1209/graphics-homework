@@ -10,7 +10,6 @@
 #include <etna/GlobalContext.hpp>
 #include <etna/OneShotCmdMgr.hpp>
 
-
 std::optional<tinygltf::Model> SceneLoader::loadModel(std::filesystem::path path)
 {
   tinygltf::Model model;
@@ -59,21 +58,25 @@ std::optional<SceneData> SceneLoader::selectScene(std::filesystem::path path)
   // Resolve node transforms
   auto [transforms, instMeshes] = processInstances(model);
   // Unpack vertex data and relems
-  auto [vertIndBuffer, indexOffset, relems, meshs] = processMeshes(model);
+  auto [relems, meshs] = processMeshes(model);
 
   // Group repeating relems and separete the non-repeating ones
   auto [groupedRelemsInstances, groupedRelems, singleRelems] =
     processGroups(instMeshes, meshs, relems);
   auto vertexDesc = getVertexFormatDescription();
 
+  auto [vertexData, indexData, textures] = uploadGpuData(model);
+
   return SceneData{
-    .vertIndBuffer = std::move(vertIndBuffer),
-    .indexOffset = indexOffset,
+    .vertexData = std::move(vertexData),
+    .indexData = std::move(indexData),
+    .textures = std::move(textures),
     .singleRelems = std::move(singleRelems),
     .groupedRelems = std::move(groupedRelems),
     .groupedRelemsInstances = std::move(groupedRelemsInstances),
     .transforms = std::move(transforms),
-    .vertexDesc = std::move(vertexDesc)};
+    .vertexDesc = std::move(vertexDesc),
+  };
 }
 
 SceneLoader::ProcessedInstances SceneLoader::processInstances(const tinygltf::Model& model) const
@@ -183,26 +186,21 @@ SceneLoader::ProcessedMeshes SceneLoader::processMeshes(const tinygltf::Model& m
 
     for (const auto& prim : mesh.primitives)
     {
-      auto& ind_accessor = model.accessors[prim.indices];
-      auto& pos_accessor = model.accessors[prim.attributes.at("POSITION")];
+      auto& indAccessor = model.accessors[prim.indices];
+      auto& posAccessor = model.accessors[prim.attributes.at("POSITION")];
       BoundingBox box;
 
-      std::copy(pos_accessor.maxValues.begin(), pos_accessor.maxValues.end(), box.posMax.begin());
-      std::copy(pos_accessor.minValues.begin(), pos_accessor.minValues.end(), box.posMin.begin());
+      std::copy(posAccessor.maxValues.begin(), posAccessor.maxValues.end(), box.posMax.begin());
+      std::copy(posAccessor.minValues.begin(), posAccessor.minValues.end(), box.posMin.begin());
 
       result.relems.push_back(RenderElement{
-        .vertexOffset = static_cast<std::uint32_t>(pos_accessor.byteOffset / sizeof(Vertex)),
-        .vertexCount = static_cast<std::uint32_t>(pos_accessor.count),
-        .indexOffset = static_cast<std::uint32_t>(ind_accessor.byteOffset / sizeof(uint32_t)),
-        .indexCount = static_cast<std::uint32_t>(ind_accessor.count),
+        .vertexOffset = static_cast<std::uint32_t>(posAccessor.byteOffset / sizeof(Vertex)),
+        .vertexCount = static_cast<std::uint32_t>(posAccessor.count),
+        .indexOffset = static_cast<std::uint32_t>(indAccessor.byteOffset / sizeof(uint32_t)),
+        .indexCount = static_cast<std::uint32_t>(indAccessor.count),
         .box = box,
       });
     }
-  }
-
-  {
-    result.indexOffset = model.bufferViews[0].byteLength;
-    result.vertIndBuffer = std::move(model.buffers[0].data);
   }
 
   return result;
@@ -317,4 +315,74 @@ etna::VertexByteStreamFormatDescription SceneLoader::getVertexFormatDescription(
         .offset = sizeof(glm::vec4),
       },
     }};
+}
+
+static vk::Format getImageFormat(const tinygltf::Image& image)
+{
+  if (image.bits == 8)
+  {
+    switch (image.component)
+    {
+    case 1:
+      return vk::Format::eR8Unorm;
+    case 2:
+      return vk::Format::eR8G8Unorm;
+    case 3:
+      return vk::Format::eR8G8B8Unorm;
+    case 4:
+      return vk::Format::eR8G8B8A8Unorm;
+    default:
+      break;
+    }
+  }
+  ETNA_PANIC("Non-8bit formats aren't supported yet!");
+}
+
+SceneLoader::GpuData SceneLoader::uploadGpuData(const tinygltf::Model& model) const
+{
+  auto& ctx = etna::get_context();
+  auto mgr = ctx.createOneShotCmdMgr();
+  auto transfer = etna::BlockingTransferHelper({.stagingSize = 1024 * 1024});
+
+  const std::byte* data = reinterpret_cast<const std::byte*>(model.buffers[0].data.data());
+  auto vertexDataCpu = std::span{data, model.bufferViews[0].byteLength};
+
+  etna::Buffer vertexData = ctx.createBuffer(etna::Buffer::CreateInfo{
+    .size = model.bufferViews[0].byteLength,
+    .bufferUsage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+    .name = "SM_VertexData"});
+
+  transfer.uploadBuffer(*mgr, vertexData, 0, vertexDataCpu);
+
+  auto indexDataCpu =
+    std::span{data + model.bufferViews[0].byteLength, model.bufferViews[1].byteLength};
+
+  etna::Buffer indexData = ctx.createBuffer(etna::Buffer::CreateInfo{
+    .size = model.bufferViews[0].byteLength,
+    .bufferUsage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+    .name = "SM_IndexData"});
+
+  transfer.uploadBuffer(*mgr, indexData, 0, indexDataCpu);
+
+  std::vector<etna::Image> textures;
+
+  for (auto& image : model.images)
+  {
+    textures.emplace_back(ctx.createImage(etna::Image::CreateInfo{
+      .extent =
+        vk::Extent3D{
+          .width = static_cast<uint32_t>(image.width),
+          .height = static_cast<uint32_t>(image.height),
+          .depth = 1},
+      .name = "texture",
+      .format = getImageFormat(image),
+      .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+      .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+    }));
+    const std::byte* imageData = reinterpret_cast<const std::byte*>(image.image.data());
+    transfer.uploadImage(*mgr, textures.back(), 0, 0, {imageData, image.image.size()});
+  }
+  return {std::move(vertexData), std::move(indexData), std::move(textures)};
 }

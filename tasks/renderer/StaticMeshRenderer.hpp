@@ -7,6 +7,8 @@
 
 #include <etna/GraphicsPipeline.hpp>
 #include <etna/ComputePipeline.hpp>
+#include <etna/Image.hpp>
+#include <etna/DescriptorSet.hpp>
 
 class StaticMeshRenderer
 {
@@ -22,7 +24,6 @@ public:
   void renderScene(vk::CommandBuffer cmd_buf);
 
 private:
-  vk::DescriptorSet textures;
 
   etna::Buffer vertexData;
   etna::Buffer indexData;
@@ -46,6 +47,10 @@ private:
   etna::ComputePipeline singleCullPipeline;
 
   etna::VertexByteStreamFormatDescription vertexDesc;
+
+  std::vector<etna::Image> textures;
+  etna::DescriptorSet textureSet;
+
   glm::mat4 matrVfW{};
 };
 

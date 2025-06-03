@@ -7,24 +7,29 @@
 #include <etna/Profiling.hpp>
 #include "shaders/static/static.h"
 
+
 // Maybe these should just be one class, but I think it's more neat otherwise
 static_assert(sizeof(REInstance) == sizeof(REInstanceCullingInfo));
 
 void StaticMeshRenderer::loadScene(std::filesystem::path path)
 {
   ZoneScopedN("loadStaticData");
-  SceneLoader loader;
-  auto maybeSceneDesc = loader.selectScene(path);
-  if (!maybeSceneDesc)
+  SceneData sceneDesc;
   {
-    spdlog::error("Failed to load scene at {}", path.string());
-    std::exit(1);
+    ZoneScopedN("loadSceneGeometry");
+    SceneLoader loader;
+    auto maybeSceneDesc = loader.selectScene(path);
+    if (!maybeSceneDesc)
+    {
+      spdlog::error("Failed to load scene at {}", path.string());
+      std::exit(1);
+    }
+    sceneDesc = std::move(*maybeSceneDesc);
   }
-  SceneData sceneDesc = std::move(*maybeSceneDesc);
   {
     ZoneScopedN("transferStaticData");
     etna::BlockingTransferHelper transfer(etna::BlockingTransferHelper::CreateInfo{
-      .stagingSize = sceneDesc.getVertexData().size_bytes(),
+      .stagingSize = 1024 * 1024,
     });
     std::unique_ptr<etna::OneShotCmdMgr> mgr = etna::get_context().createOneShotCmdMgr();
 
@@ -125,19 +130,9 @@ void StaticMeshRenderer::loadScene(std::filesystem::path path)
         .name = "SM_InstanceRenderInfoDrawcalls",
       });
     }
-    vertexData = ctx.createBuffer(etna::Buffer::CreateInfo{
-      .size = sceneDesc.getVertexData().size_bytes(),
-      .bufferUsage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-      .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-      .name = "SM_VertexData"});
-    transfer.uploadBuffer(*mgr, vertexData, 0, sceneDesc.getVertexData());
-
-    indexData = ctx.createBuffer(etna::Buffer::CreateInfo{
-      .size = sceneDesc.getIndices().size_bytes(),
-      .bufferUsage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-      .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-      .name = "SM_VertexData"});
-    transfer.uploadBuffer(*mgr, indexData, 0, sceneDesc.getIndices());
+    vertexData = std::move(sceneDesc.vertexData);
+    indexData = std::move(sceneDesc.indexData);
+    textures = std::move(sceneDesc.textures);
   }
 }
 

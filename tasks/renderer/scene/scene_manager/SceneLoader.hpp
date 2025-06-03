@@ -6,6 +6,7 @@
 
 #include <glm/glm.hpp>
 #include <tiny_gltf.h>
+#include <etna/BlockingTransferHelper.hpp>
 
 #include "../RenderingPrimitives.hpp"
 
@@ -33,8 +34,6 @@ private:
 
   struct ProcessedMeshes
   {
-    std::vector<unsigned char> vertIndBuffer;
-    size_t indexOffset;
     std::vector<RenderElement> relems;
     std::vector<Mesh> meshes;
   };
@@ -53,7 +52,15 @@ private:
     const std::vector<Mesh>& meshes,
     const std::vector<RenderElement>& relems);
 
+  struct GpuData{
+    etna::Buffer vertexData;
+    etna::Buffer indexData;
+    std::vector<etna::Image> textures;
+  };
+  GpuData uploadGpuData(const tinygltf::Model& model) const;
+
   etna::VertexByteStreamFormatDescription getVertexFormatDescription() const;
+
 
 private:
   tinygltf::TinyGLTF loader;
