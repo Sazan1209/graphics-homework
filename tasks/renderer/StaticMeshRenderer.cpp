@@ -12,6 +12,16 @@
 // Maybe these should just be one class, but I think it's more neat otherwise
 static_assert(sizeof(REInstance) == sizeof(REInstanceCullingInfo));
 
+static MaterialCompat makeCompat(const Material& src)
+{
+  return {
+    .albedoIndex = src.albedoIndex,
+    .normalIndex = src.normalIndex,
+    .normalScale = src.normalScale,
+    .albedoFactor = src.albedoFactor,
+  };
+}
+
 void StaticMeshRenderer::loadScene(std::filesystem::path path)
 {
   ZoneScopedN("loadStaticData");
@@ -80,6 +90,7 @@ void StaticMeshRenderer::loadScene(std::filesystem::path path)
           dst.min_coord[i] = src.element.box.posMin[i];
         }
         dst.matrWfMIndex = src.matrixPos;
+        dst.material = makeCompat(src.element.material);
       }
       transfer.uploadBuffer(
         *mgr, singleRelemData, 0, std::span<const SingleREIndirectCommand>(tmp));
@@ -111,6 +122,7 @@ void StaticMeshRenderer::loadScene(std::filesystem::path path)
           dst.max_coord[i] = src.element.box.posMax[i];
           dst.min_coord[i] = src.element.box.posMin[i];
         }
+        dst.material = makeCompat(src.element.material);
       }
       transfer.uploadBuffer(*mgr, drawCallsGRE, 0, std::span<const GroupREIndirectCommand>(tmp));
 

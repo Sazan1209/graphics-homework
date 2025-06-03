@@ -160,6 +160,28 @@ SceneLoader::ProcessedInstances SceneLoader::processInstances(const tinygltf::Mo
   return result;
 }
 
+
+static Material getMaterial(const tinygltf::Model& model, int index)
+{
+  if (index == -1)
+  {
+    return Material{};
+  }
+
+  const tinygltf::Material& material = model.materials[index];
+  glm::vec4 albedoFactor;
+  for (size_t i = 0; i < 4; ++i)
+  {
+    albedoFactor[i] = material.pbrMetallicRoughness.baseColorFactor[i];
+  }
+  return {
+    .albedoIndex = static_cast<uint32_t>(material.pbrMetallicRoughness.baseColorTexture.index),
+    .albedoFactor = albedoFactor,
+    .normalIndex = static_cast<uint32_t>(material.normalTexture.index),
+    .normalScale = static_cast<float>(material.normalTexture.scale),
+  };
+}
+
 SceneLoader::ProcessedMeshes SceneLoader::processMeshes(const tinygltf::Model& model) const
 {
 
@@ -199,6 +221,7 @@ SceneLoader::ProcessedMeshes SceneLoader::processMeshes(const tinygltf::Model& m
         .indexOffset = static_cast<std::uint32_t>(indAccessor.byteOffset / sizeof(uint32_t)),
         .indexCount = static_cast<std::uint32_t>(indAccessor.count),
         .box = box,
+        .material = getMaterial(model, prim.material),
       });
     }
   }

@@ -13,6 +13,15 @@ struct Command{
   shader_uint firstInstance;
 };
 
+struct MaterialCompat{
+  shader_uint albedoIndex;
+  shader_uint normalIndex;
+  shader_float normalScale;
+  CPU_ONLY(float padding = -1.0;)
+
+  shader_vec4 albedoFactor;
+};
+
 struct SingleREIndirectCommand
 { 
   shader_vec3 min_coord;
@@ -20,17 +29,20 @@ struct SingleREIndirectCommand
   shader_vec3 max_coord;
 
   Command command;
+  MaterialCompat material;
 };
-CPU_ONLY(static_assert(sizeof(SingleREIndirectCommand) == 12 * sizeof(float));)
+
+CPU_ONLY(static_assert(sizeof(SingleREIndirectCommand) == 20 * sizeof(float));)
 
 struct GroupREIndirectCommand
 {
   shader_vec3 min_coord;
-  CPU_ONLY(float padding;)
+  CPU_ONLY(float padding = -1.0;)
   shader_vec3 max_coord;
   Command command;
+  MaterialCompat material;
 };
-CPU_ONLY(static_assert(sizeof(GroupREIndirectCommand) == 12 * sizeof(float));)
+CPU_ONLY(static_assert(sizeof(GroupREIndirectCommand) == 20 * sizeof(float));)
 
 struct REInstanceCullingInfo
 {
