@@ -59,6 +59,10 @@ struct Vertex
 
 static_assert(sizeof(Vertex) == sizeof(float) * 8);
 
+struct Texture{
+  etna::Image image;
+};
+
 struct SceneData
 {
   // GPU-only data

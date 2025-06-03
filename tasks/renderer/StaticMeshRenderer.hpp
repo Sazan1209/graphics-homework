@@ -13,6 +13,7 @@
 class StaticMeshRenderer
 {
 public:
+  ~StaticMeshRenderer();
   void loadScene(std::filesystem::path path);
 
   void loadShaders();
@@ -24,6 +25,8 @@ public:
   void renderScene(vk::CommandBuffer cmd_buf);
 
 private:
+
+  void createDescSet();
 
   etna::Buffer vertexData;
   etna::Buffer indexData;
@@ -49,9 +52,13 @@ private:
   etna::VertexByteStreamFormatDescription vertexDesc;
 
   std::vector<etna::Image> textures;
-  etna::DescriptorSet textureSet;
+  vk::DescriptorSet textureSet;
+  vk::DescriptorPool textureSetPool;
+  vk::DescriptorSetLayout textureSetLayout;
 
   glm::mat4 matrVfW{};
+
+  constexpr static size_t MAX_DESCRIPTOR_NUM = 128;
 };
 
 #endif // STATICMESHRENDERER_HPP

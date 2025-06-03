@@ -25,7 +25,12 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
 
   deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-  auto vk11Features = vk::PhysicalDeviceVulkan11Features{.shaderDrawParameters = VK_TRUE};
+  auto indexingFeatures = vk::PhysicalDeviceDescriptorIndexingFeatures{
+    .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
+    .descriptorBindingPartiallyBound = VK_TRUE,
+  };
+  auto vk11Features =
+    vk::PhysicalDeviceVulkan11Features{.pNext = &indexingFeatures, .shaderDrawParameters = VK_TRUE};
 
   etna::initialize(etna::InitParams{
     .applicationName = "model_bakery_renderer",

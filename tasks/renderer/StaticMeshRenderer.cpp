@@ -4,6 +4,7 @@
 #include <etna/OneShotCmdMgr.hpp>
 #include <etna/Assert.hpp>
 #include <etna/PipelineManager.hpp>
+#include <etna/Sampler.hpp>
 #include <etna/Profiling.hpp>
 #include "shaders/static/static.h"
 
@@ -134,6 +135,7 @@ void StaticMeshRenderer::loadScene(std::filesystem::path path)
     indexData = std::move(sceneDesc.indexData);
     textures = std::move(sceneDesc.textures);
   }
+  createDescSet();
 }
 
 void StaticMeshRenderer::loadShaders()
@@ -404,4 +406,101 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
       vk::PipelineStageFlagBits2::eVertexShader,
       vk::AccessFlagBits2::eShaderStorageRead);
   }
+}
+
+void StaticMeshRenderer::createDescSet()
+{
+
+  auto& ctx = etna::get_context();
+  auto device = ctx.getDevice();
+  {
+    vk::DescriptorPoolSize poolSize{
+      .type = vk::DescriptorType::eCombinedImageSampler,
+      .descriptorCount = MAX_DESCRIPTOR_NUM,
+    };
+
+    vk::DescriptorPoolCreateInfo info{
+      .flags = vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+      .maxSets = 1,
+      .poolSizeCount = 1,
+      .pPoolSizes = &poolSize,
+    };
+
+    textureSetPool = etna::unwrap_vk_result(device.createDescriptorPool(info));
+  }
+  {
+    auto binding = vk::DescriptorSetLayoutBinding{
+      .binding = 0,
+      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+      .descriptorCount = MAX_DESCRIPTOR_NUM,
+      .stageFlags = vk::ShaderStageFlagBits::eAll,
+      .pImmutableSamplers = nullptr,
+    };
+
+    auto bindlessFlags = vk::DescriptorBindingFlags{
+      vk::DescriptorBindingFlagBits::ePartiallyBound |
+      vk::DescriptorBindingFlagBits::eUpdateAfterBind};
+    auto extendedInfo = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT{
+      .bindingCount = 1,
+      .pBindingFlags = &bindlessFlags,
+    };
+
+    auto layoutInfo = vk::DescriptorSetLayoutCreateInfo{
+      .pNext = &extendedInfo,
+      .flags = vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPoolEXT,
+      .bindingCount = 1,
+      .pBindings = &binding,
+    };
+
+    textureSetLayout = etna::unwrap_vk_result(device.createDescriptorSetLayout(layoutInfo));
+  }
+  {
+    uint32_t descriptorCount = static_cast<uint32_t>(MAX_DESCRIPTOR_NUM);
+
+    vk::DescriptorSetVariableDescriptorCountAllocateInfo extraInfo{
+      .descriptorSetCount = 1,
+      .pDescriptorCounts = &descriptorCount,
+    };
+
+    vk::DescriptorSetAllocateInfo setAllocInfo{
+      .pNext = &extraInfo,
+      .descriptorPool = textureSetPool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &textureSetLayout,
+    };
+
+    textureSet = etna::unwrap_vk_result(device.allocateDescriptorSets(setAllocInfo))[0];
+  }
+  {
+    etna::Sampler sampler(etna::Sampler::CreateInfo{.name = "SM_DefaultSampler"});
+    std::vector<vk::DescriptorImageInfo> imageInfos;
+    imageInfos.reserve(textures.size());
+    for (auto& texture : textures)
+    {
+      imageInfos.push_back(vk::DescriptorImageInfo{
+        .sampler = sampler.get(),
+        .imageView =
+          texture.getView({0, vk::RemainingMipLevels, 0, vk::RemainingArrayLayers, {}, {}}),
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+      });
+    }
+
+    vk::WriteDescriptorSet write{
+      .dstSet = textureSet,
+      .dstBinding = 0,
+      .dstArrayElement = 0,
+      .descriptorCount = static_cast<uint32_t>(textures.size()),
+      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+      .pImageInfo = imageInfos.data(),
+    };
+
+    device.updateDescriptorSets(1, &write, 0, nullptr);
+  }
+}
+
+StaticMeshRenderer::~StaticMeshRenderer()
+{
+  auto device = etna::get_context().getDevice();
+  device.destroyDescriptorPool(textureSetPool);
+  device.destroyDescriptorSetLayout(textureSetLayout);
 }
