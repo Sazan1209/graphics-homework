@@ -1,0 +1,56 @@
+#version 430
+#extension GL_GOOGLE_include_directive : require
+
+#include "tonemap.glsl"
+
+layout(local_size_x = 32, local_size_y = 32) in;
+
+layout(push_constant) uniform terraintest_pc{
+  bool forceLinear;
+};
+
+layout(binding = 0, r11f_g11f_b10f) restrict uniform image2D image;
+layout(binding = 1, std430) buffer A
+{
+  float minLum;
+  float maxLum;
+  float cumDist[bucketCount];
+};
+
+void main()
+{
+  const ivec2 size = imageSize(image);
+  if (!all(greaterThan(size, gl_GlobalInvocationID.xy)))
+  {
+    return;
+  }
+
+  vec3 pixel = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).xyz;
+
+  const float lum = dot(pixel, lumVec);
+  // linear interpolation
+  if (forceLinear || maxLum / minLum <= maxScreenLum / minScreenLum)
+  {
+    pixel = (pixel / maxLum);
+  }
+  else
+  {
+    const float minB = log(minLum);
+    const float maxB = log(maxLum);
+    const float dB = (maxB - minB) / bucketCount;
+    const float b = log(lum);
+    const uint ind = min(uint(floor((b - minB) / dB)), bucketCount - 1);
+
+    const float total = cumDist[bucketCount - 1];
+    const float distrPrev = ind == 0 ? 0.0 : float(cumDist[ind - 1]) / total;
+    const float distr = float(cumDist[ind]) / total;
+
+    const float coef = (b - minB) / dB - float(ind);
+    const float diff = mix(distrPrev, distr, coef);
+
+    const float resB = mix(minScreenB, maxScreenB, diff);
+    pixel = pixel * exp(resB) / lum;
+  }
+  pixel = pow(pixel, vec3(2.2));
+  imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
+}

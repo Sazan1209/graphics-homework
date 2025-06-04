@@ -1,0 +1,30 @@
+#version 430
+#extension GL_GOOGLE_include_directive : require
+
+#include "terrain.glsl"
+
+
+layout(local_size_x = 32, local_size_y = 32) in;
+
+layout(binding = 0, r32f) restrict readonly uniform image2D heightMap;
+layout(binding = 1, rgba8) restrict writeonly uniform image2D normal;
+
+const vec2 pixSize = terrainSize / vec2(heightMapSize);
+
+vec3 calcNorm(ivec2 texCoord)
+{
+  float left = imageLoad(heightMap, texCoord + ivec2(-1, 0)).x;
+  float right = imageLoad(heightMap, texCoord + ivec2(1, 0)).x;
+  float up = imageLoad(heightMap, texCoord + ivec2(0, 1)).x;
+  float down = imageLoad(heightMap, texCoord + ivec2(0, -1)).x;
+
+  return -normalize(vec3((right - left) / (2 * pixSize.x), -1.0, (up - down) / (2 * pixSize.y)));
+}
+
+void main()
+{
+  ivec2 idxy = ivec2(gl_GlobalInvocationID.xy);
+  idxy = clamp(idxy, ivec2(1, 1), ivec2(heightMapSize - 2u));
+  vec3 res = calcNorm(idxy);
+  imageStore(normal, idxy, vec4(res, 0));
+}

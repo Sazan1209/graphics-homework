@@ -1,0 +1,44 @@
+#version 430
+
+#extension GL_GOOGLE_include_directive : require
+
+
+#include "../resolve.h"
+#include "terrain.glsl"
+
+layout(local_size_x = 1024) in;
+
+layout(binding = 0, r32f) restrict readonly uniform image2D heightMap;
+
+layout(binding = 1, std430) buffer a
+{
+  PointLight lights[];
+};
+
+float rand(float n)
+{
+  return fract(sin(n * 100.0 * float(gl_LocalInvocationIndex + 3)) * 43758.5453123);
+}
+
+void main()
+{
+  uint ind = gl_LocalInvocationIndex;
+  if (lights.length() <= ind)
+  {
+    return;
+  }
+
+  vec2 texCoord = vec2(rand(-2), rand(-1));
+
+  float height = imageLoad(heightMap, ivec2(floor(texCoord * vec2(heightMapSize)))).x;
+  float heightAdd = rand(20);
+  height += 5 * heightAdd;
+
+  vec3 posModel = vec3(texCoord * terrainSize, height).xzy;
+
+  vec3 posWorld = posModel - centerCoordModel;
+  posWorld.z = -posWorld.z;
+  posWorld += centerCoordWorld;
+
+  lights[ind] = PointLight(vec3(rand(1), rand(2), rand(3)), 30.0 * rand(20), posWorld, heightAdd);
+}

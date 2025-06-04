@@ -1,0 +1,67 @@
+#version 430
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+shared vec3 buf[256];
+layout(binding = 0, r11f_g11f_b10f) restrict readonly uniform image2D src;
+layout(binding = 1, r11f_g11f_b10f) restrict writeonly uniform image2D dst;
+
+vec3 get(vec2 coord) {
+  ivec2 coordI = ivec2(floor(coord));
+  vec3 p00 = imageLoad(src, coordI).xyz;
+  vec3 p01 = imageLoad(src, coordI + ivec2(0, 1)).xyz;
+  vec3 p10 = imageLoad(src, coordI + ivec2(1, 0)).xyz;
+  vec3 p11 = imageLoad(src, coordI + ivec2(1, 1)).xyz;
+  vec2 coef = fract(coord);
+  vec3 p0 = mix(p00, p01, coef.x);
+  vec3 p1 = mix(p10, p11, coef.x);
+  vec3 p = mix(p0, p1, coef.y);
+  return p;
+}
+
+void main()
+{
+  uvec2 sizeSrc = imageSize(src);
+  uvec2 sizeDst = imageSize(dst);
+
+  vec2 pixSize = vec2(sizeSrc) / vec2(sizeDst);
+
+  vec2 coordBegin = vec2(gl_WorkGroupID.xy) * pixSize;
+  vec2 coordEnd = coordBegin + pixSize;
+
+  vec2 currCoord = coordBegin + vec2(gl_LocalInvocationID.xy);
+
+  vec3 res = vec3(0.0);
+  for (float x = currCoord.x; x < coordEnd.x; x += 16.0)
+  {
+    for (float y = currCoord.y; y < coordEnd.y; y += 16.0)
+    {
+      res += get(vec2(x, y));
+    }
+  }
+
+  uint ind = gl_LocalInvocationIndex;
+  buf[ind] = res;
+
+  for (uint i = 1; i < 16 * 16; i <<= 1)
+  {
+    barrier();
+    if ((ind & i) != 0)
+    {
+      buf[ind] += buf[ind ^ i];
+    }
+    else
+    {
+      ind = 0;
+    }
+  }
+
+  if (ind != 0)
+  {
+    res = buf[ind];
+    res /= pixSize.x * pixSize.y;
+    imageStore(dst, ivec2(gl_WorkGroupID.xy), vec4(res, 1.0));
+  }
+
+}
