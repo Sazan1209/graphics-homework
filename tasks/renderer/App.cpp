@@ -17,12 +17,12 @@ App::App()
 
   auto surface = mainWindow->createVkSurface(etna::get_context().getInstance());
 
-  renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes_baked/LowPolyTown/scene_baked.gltf");
+  renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes_baked/Avocado/Avocado_baked.gltf");
   renderer->initFrameDelivery(std::move(surface), [this]() { return mainWindow->getResolution(); });
   ImGuiRenderer::enableImGuiForWindow(mainWindow->native());
 
   mainCam.zFar = 1024.0f;
-  mainCam.zNear = 0.125f;
+  mainCam.zNear = 0.05f;
   mainCam.lookAt({0, 0, 0}, {0, 0, -1}, {0, 1, 0});
 }
 

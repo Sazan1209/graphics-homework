@@ -176,9 +176,23 @@ void StaticMeshRenderer::setupPipelines()
       .byteStreamDescription = vertexDesc,
     }},
   };
-  singleRenderPipeline =
-    pipelineManager.createGraphicsPipeline(
+  auto device = etna::get_context().getDevice();
+  {
+    std::array<vk::DescriptorSetLayout, 2> descSetLayouts;
+    auto info = etna::get_shader_program("single_sm_render");
+    descSetLayouts[0] = info.getDescriptorSetLayout(0);
+    descSetLayouts[1] = textureSetLayout;
+    auto pushConstRange = info.getPushConst();
+    singleRenderLayout =
+      etna::unwrap_vk_result(device.createPipelineLayout(vk::PipelineLayoutCreateInfo{
+        .setLayoutCount = 2,
+        .pSetLayouts = descSetLayouts.data(),
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pushConstRange,
+      }));
+    singleRenderPipeline = pipelineManager.createGraphicsPipeline(
       "single_sm_render",
+      singleRenderLayout,
       etna::GraphicsPipeline::CreateInfo{
         .vertexShaderInput = sceneVertexInputDesc,
         .rasterizationConfig =
@@ -208,9 +222,23 @@ void StaticMeshRenderer::setupPipelines()
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
-  groupRenderPipeline =
-    pipelineManager.createGraphicsPipeline(
+  }
+  {
+    std::array<vk::DescriptorSetLayout, 2> descSetLayouts;
+    auto info = etna::get_shader_program("group_sm_render");
+    descSetLayouts[0] = info.getDescriptorSetLayout(0);
+    descSetLayouts[1] = textureSetLayout;
+    auto pushConstRange = info.getPushConst();
+    groupRenderLayout =
+      etna::unwrap_vk_result(device.createPipelineLayout(vk::PipelineLayoutCreateInfo{
+        .setLayoutCount = 2,
+        .pSetLayouts = descSetLayouts.data(),
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pushConstRange,
+      }));
+    groupRenderPipeline = pipelineManager.createGraphicsPipeline(
       "group_sm_render",
+      groupRenderLayout,
       etna::GraphicsPipeline::CreateInfo{
         .vertexShaderInput = sceneVertexInputDesc,
         .rasterizationConfig =
@@ -240,6 +268,7 @@ void StaticMeshRenderer::setupPipelines()
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
+  }
   groupResetPipeline = pipelineManager.createComputePipeline("reset_group_comms", {});
   groupCullPipeline = pipelineManager.createComputePipeline("cull_group", {});
   singleCullPipeline = pipelineManager.createComputePipeline("cull_single", {});
@@ -265,11 +294,11 @@ void StaticMeshRenderer::renderScene(vk::CommandBuffer cmd_buf)
     auto& pipeline = singleRenderPipeline;
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
     cmd_buf.bindDescriptorSets(
-      vk::PipelineBindPoint::eGraphics, pipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
+      vk::PipelineBindPoint::eGraphics, singleRenderLayout, 0, {vkSet, textureSet}, {});
     cmd_buf.bindVertexBuffers(0, {vertexData.get()}, {0});
     cmd_buf.bindIndexBuffer(indexData.get(), 0, vk::IndexType::eUint32);
     cmd_buf.pushConstants<glm::mat4>(
-      pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex, 0, {matrVfW});
+      singleRenderLayout, vk::ShaderStageFlagBits::eVertex, 0, {matrVfW});
     cmd_buf.drawIndexedIndirect(
       singleRelemData.get(),
       offsetof(SingleREIndirectCommand, command),
@@ -279,8 +308,9 @@ void StaticMeshRenderer::renderScene(vk::CommandBuffer cmd_buf)
   if (groupRelemCount != 0)
   {
     auto info = etna::get_shader_program("group_sm_render");
-    auto binding0 = renderInfoGRE.genBinding();
-    auto binding1 = relemMtWTransforms.genBinding();
+    auto binding0 = drawCallsGRE.genBinding();
+    auto binding1 = renderInfoGRE.genBinding();
+    auto binding2 = relemMtWTransforms.genBinding();
 
     auto set = etna::create_descriptor_set(
       info.getDescriptorLayoutId(0),
@@ -288,16 +318,18 @@ void StaticMeshRenderer::renderScene(vk::CommandBuffer cmd_buf)
       {
         etna::Binding{0, binding0},
         etna::Binding{1, binding1},
+        etna::Binding{2, binding2},
       });
     vk::DescriptorSet vkSet = set.getVkSet();
     auto& pipeline = groupRenderPipeline;
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+
     cmd_buf.bindDescriptorSets(
-      vk::PipelineBindPoint::eGraphics, pipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, nullptr);
+      vk::PipelineBindPoint::eGraphics, groupRenderLayout, 0, {vkSet, textureSet}, {});
     cmd_buf.bindVertexBuffers(0, {vertexData.get()}, {0});
     cmd_buf.bindIndexBuffer(indexData.get(), 0, vk::IndexType::eUint32);
     cmd_buf.pushConstants<glm::mat4>(
-      pipeline.getVkPipelineLayout(), vk::ShaderStageFlagBits::eVertex, 0, {matrVfW});
+      groupRenderLayout, vk::ShaderStageFlagBits::eVertex, 0, {matrVfW});
     cmd_buf.drawIndexedIndirect(
       drawCallsGRE.get(),
       offsetof(GroupREIndirectCommand, command),
@@ -322,7 +354,6 @@ void StaticMeshRenderer::prepareForRender(vk::CommandBuffer cmd_buf)
     auto info = etna::get_shader_program("cull_single");
     auto binding0 = singleRelemData.genBinding();
     auto binding1 = relemMtWTransforms.genBinding();
-
 
     auto set = etna::create_descriptor_set(
       info.getDescriptorLayoutId(0),
@@ -515,4 +546,6 @@ StaticMeshRenderer::~StaticMeshRenderer()
   auto device = etna::get_context().getDevice();
   device.destroyDescriptorPool(textureSetPool);
   device.destroyDescriptorSetLayout(textureSetLayout);
+  device.destroyPipelineLayout(singleRenderLayout);
+  device.destroyPipelineLayout(groupRenderLayout);
 }

@@ -44,7 +44,9 @@ private:
   etna::Buffer renderInfoGRE;
 
   etna::GraphicsPipeline singleRenderPipeline;
+  vk::PipelineLayout singleRenderLayout;
   etna::GraphicsPipeline groupRenderPipeline;
+  vk::PipelineLayout groupRenderLayout;
   etna::ComputePipeline groupResetPipeline;
   etna::ComputePipeline groupCullPipeline;
   etna::ComputePipeline singleCullPipeline;
