@@ -1,0 +1,35 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 32) in;
+
+
+#include "static.h"
+#include "../utils.glsl"
+
+layout(binding = 0, std430) restrict buffer cullsingle_buf_0
+{
+  SingleREIndirectCommand comms[];
+};
+
+layout(binding = 1, std430) readonly restrict buffer cullsingle_buf_1
+{
+  mat4 matricesWfM[];
+};
+
+layout(push_constant) uniform cullsingle_pc
+{
+  mat4 matrixVfW;
+};
+
+void main()
+{
+
+  uint ind = gl_GlobalInvocationID.x;
+  if (ind >= comms.length()){
+    return;
+  }
+  mat4 matrixWfM = matricesWfM[comms[ind].matrWfMIndex];
+  bool shouldCull = Cull(comms[ind].min_coord, comms[ind].max_coord, matrixVfW * matrixWfM);
+  comms[ind].command.instanceCount = shouldCull ? 0 : 1;
+}

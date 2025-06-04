@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "terrain.glsl"
+#include "../utils.glsl"
 
 layout(vertices = 2) out;
 layout(push_constant) uniform terraintesc_pc
@@ -47,32 +48,6 @@ float GetTessLevel(in float dist)
   return mix(minTess, maxTess, coef);
 }
 
-bool Cull(vec3 minP, vec3 maxP)
-{
-
-  vec3 minV;
-  vec3 maxV;
-  {
-    vec4 proj = mProjView * vec4(minP, 1);
-    proj /= abs(proj.w);
-    minV = proj.xyz;
-    maxV = proj.xyz;
-  }
-  for (uint mask = 1; mask < 8u; ++mask)
-  {
-    vec3 point;
-    for (uint i = 0; i < 3; ++i)
-    {
-      point[i] = ((mask & (1u << i)) > 0) ? maxP[i] : minP[i];
-    }
-    vec4 corner = mProjView * vec4(point, 1);
-    corner /= abs(corner.w);
-    minV = min(minV, corner.xyz);
-    maxV = max(maxV, corner.xyz);
-  }
-  return any(lessThan(maxV, vec3(-1, -1, 0))) || any(greaterThan(minV, vec3(1, 1, 1)));
-}
-
 void main()
 {
   const vec3 corner00 = calcPosWorld(0);
@@ -85,7 +60,7 @@ void main()
   vec3 maxP = corner10;
   maxP.y += zScale;
 
-  if (Cull(minP, maxP))
+  if (Cull(minP, maxP, mProjView))
   {
     for (uint i = 0; i < 4; ++i)
       gl_TessLevelOuter[i] = -1.0;
