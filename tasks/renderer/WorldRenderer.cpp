@@ -93,6 +93,7 @@ void WorldRenderer::loadScene(std::filesystem::path path)
 void WorldRenderer::loadShaders()
 {
   staticRenderer.loadShaders();
+  grassRenderer.loadShaders();
   etna::create_program(
     "terrain_render",
     {COMPLETE_RENDERER_SHADERS_ROOT "terrain.vert.spv",
@@ -116,6 +117,7 @@ void WorldRenderer::setupPipelines()
 {
   auto& pipelineManager = etna::get_context().getPipelineManager();
   staticRenderer.setupPipelines();
+  grassRenderer.setupPipelines();
 
   cubePipeline =
     pipelineManager.createGraphicsPipeline(
@@ -221,6 +223,7 @@ void WorldRenderer::update(const FramePacket& packet)
     eye = packet.mainCam.position;
   }
   staticRenderer.update(worldViewProj);
+  grassRenderer.update(worldViewProj, packet.currentTime);
 }
 
 void WorldRenderer::drawGui()
@@ -257,6 +260,7 @@ void WorldRenderer::drawGui()
     ImGui::InputFloat("Strength", &resolveUniformParams.sunlight.strength);
     ImGui::ColorPicker3("Color", (float*)&resolveUniformParams.sunlight.color);
   }
+  grassRenderer.drawGui();
   ImGui::End();
 }
 
@@ -313,6 +317,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
     staticRenderer.renderScene(cmd_buf);
     renderTerrain(cmd_buf);
     renderCube(cmd_buf);
+    grassRenderer.renderScene(cmd_buf);
   }
 
   resolve(cmd_buf);
