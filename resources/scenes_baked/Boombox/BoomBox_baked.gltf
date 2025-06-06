@@ -1,0 +1,182 @@
+{
+  "accessors": [
+    {
+      "bufferView": 1,
+      "componentType": 5125,
+      "count": 18108,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3575,
+      "max": [
+        0.009921154007315636,
+        0.00977163016796112,
+        0.010076245293021202
+      ],
+      "min": [
+        -0.009921154007315636,
+        -0.00977163016796112,
+        -0.010076245293021202
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 12,
+      "componentType": 5120,
+      "count": 3575,
+      "normalized": true,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 16,
+      "componentType": 5126,
+      "count": 3575,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 24,
+      "componentType": 5120,
+      "count": 3575,
+      "normalized": true,
+      "type": "VEC4"
+    }
+  ],
+  "asset": {
+    "generator": "glTF Tools for Unity",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 114400,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 72432,
+      "byteOffset": 114400,
+      "target": 34963
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 186832,
+      "uri": "BoomBox_baked.bin"
+    }
+  ],
+  "extensionsRequired": [
+    "KHR_mesh_quantization"
+  ],
+  "extensionsUsed": [
+    "KHR_mesh_quantization"
+  ],
+  "images": [
+    {
+      "uri": "BoomBox_baseColor.png"
+    },
+    {
+      "uri": "BoomBox_occlusionRoughnessMetallic.png"
+    },
+    {
+      "uri": "BoomBox_normal.png"
+    },
+    {
+      "uri": "BoomBox_emissive.png"
+    }
+  ],
+  "materials": [
+    {
+      "emissiveFactor": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissiveTexture": {
+        "index": 3
+      },
+      "name": "BoomBox_Mat",
+      "normalTexture": {
+        "index": 2
+      },
+      "occlusionTexture": {
+        "index": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 1
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "BoomBox",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 2,
+            "POSITION": 1,
+            "TANGENT": 4,
+            "TEXCOORD_0": 3
+          },
+          "indices": 0,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "BoomBox",
+      "rotation": [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.05
+      ]
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "source": 0
+    },
+    {
+      "source": 1
+    },
+    {
+      "source": 2
+    },
+    {
+      "source": 3
+    }
+  ]
+}
