@@ -24,7 +24,7 @@ private:
   OsWindowingManager windowing;
   std::unique_ptr<OsWindow> mainWindow;
 
-  float camMoveSpeed = 1;
+  float camMoveSpeed = 0.1;
   float camRotateSpeed = 0.1f;
   float zoomSensitivity = 2.0f;
   Camera mainCam;

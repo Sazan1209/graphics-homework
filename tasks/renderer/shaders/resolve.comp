@@ -1,30 +1,34 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-
 #include "resolve.glsl"
+#include "utils.glsl"
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(binding = 0, r11f_g11f_b10f) restrict uniform image2D albedo;
-layout(binding = 1) uniform sampler2D depths;
-layout(binding = 2, rgba8_snorm) restrict uniform image2D normals;
 
-layout(binding = 3, std430) buffer resolve_point_lights
+layout(binding = 0, rgba8) readonly uniform image2D albedoMetallic;
+layout(binding = 1, rgba8_snorm) restrict readonly uniform image2D normalOcclusion;
+layout(binding = 2, rgba8) readonly uniform image2D emissiveRoughness;
+layout(binding = 3) uniform sampler2D depths;
+
+layout(binding = 4, rgba8) writeonly uniform image2D color;
+layout(binding = 5, r32f) writeonly uniform image2D brightness;
+
+layout(binding = 6, std430) buffer resolve_point_lightsbrightness
 {
   PointLight lights[];
 };
 
-layout(binding = 4, std140) readonly restrict uniform resolve_sunlight
+layout(binding = 7, std140) readonly restrict uniform resolve_sunlight
 {
   Sunlight sunlight;
 
   vec3 skyColor;
-  float lightExponent;
+  float near;
 
   mat4 mView;
 
-  float near;
   float far;
   float tanFov;
   float attenuationCoef;
@@ -35,17 +39,78 @@ layout(binding = 4, std140) readonly restrict uniform resolve_sunlight
 // 1.0
 // 0.005
 
+float pow5(float val){
+  float tmp = val * val;
+  tmp *= tmp;
+  return tmp * val;
+}
+
+float pow2(float val){
+  return val * val;
+}
+
+float mixSqrtAdd(float val, float coef){
+  return val + sqrt(coef + (1 - coef) * val * val);
+}
+
+float heaviside(float val){
+  return step(0.0, val);
+}
+
+float specularBRDF(vec3 v, vec3 l, vec3 n, vec3 h, float vDotH, float alpha){
+  float lDotH = dot(l, h);
+  float nDotL = abs(dot(n, l));
+  float nDotV = abs(dot(n, v));
+  float nDotH = dot(n, h);
+  alpha = alpha * alpha;
+
+  float visibility = heaviside(lDotH) * heaviside(vDotH);
+  visibility /= mixSqrtAdd(nDotL, alpha) * mixSqrtAdd(nDotV, alpha) + 0.001;
+
+  float distribution = alpha * heaviside(nDotH);
+  distribution /= pow2(nDotH * nDotH * (alpha - 1.0) + 1.0) * PI + 0.001;
+
+  return visibility * distribution;
+}
+
+// v = pToEye
+// l = pToLight
+// n = normal
+vec3 BRDF(vec3 v, vec3 l, vec3 n, float metallic, float roughness, vec3 albedo){
+  vec3 h = normalize(l + v);
+  vec3 c_diff = mix(albedo.rgb, vec3(0.0), metallic);
+  vec3 f0 = mix(vec3(0.04), albedo.rgb, metallic);
+
+  float alpha = pow2(roughness);
+  float vDotH = dot(v, h);
+  vec3 F = f0 + (1 - f0) * pow5(1 - abs(vDotH));
+  vec3 f_diffuse = (1 - F) * (1 / PI) * c_diff;
+  vec3 f_specular = F * specularBRDF(v, l, n, h, vDotH, alpha);
+
+  return f_diffuse + f_specular;
+}
+
+void storeLight(vec3 light, ivec2 coord){
+  float brightnessVal = dot(light, lumVec);
+  vec3 colorVal = light / brightnessVal;
+  imageStore(color, coord, vec4(fromLinear(colorVal), 1.0));
+  imageStore(brightness, coord, vec4(brightnessVal));
+}
+
 void main()
 {
-  ivec2 resolution = imageSize(albedo);
+  ivec2 resolution = imageSize(albedoMetallic);
   if (any(greaterThan(gl_GlobalInvocationID.xy, resolution)))
   {
     return;
   }
-  float depth = texelFetch(depths, ivec2(gl_GlobalInvocationID.xy), 0).x;
+
+  ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+  float depth = texelFetch(depths, coord, 0).x;
   if (depth == 1.0)
   {
-    imageStore(albedo, ivec2(gl_GlobalInvocationID.xy), vec4(skyColor * sunlight.strength, 1.0));
+    storeLight(skyColor * sunlight.strength / 5.0, coord);
     return;
   }
 
@@ -58,8 +123,29 @@ void main()
   pos.y = -tanFov * pos.z * fragCoord.y;
   pos.x = -tanFov * pos.z * aspect * fragCoord.x;
 
-  vec3 normal = mat3(mView) * imageLoad(normals, ivec2(gl_GlobalInvocationID.xy)).xyz;
-  vec3 pixel = imageLoad(albedo, ivec2(gl_GlobalInvocationID.xy)).rgb;
+  vec3 normal;
+  float occlusion;
+  {
+    vec4 tmp = imageLoad(normalOcclusion, coord);
+    normal = mat3(mView) * tmp.xyz;
+    occlusion = tmp.w;
+  }
+
+  vec3 albedo;
+  float metallic;
+  {
+    vec4 tmp = imageLoad(albedoMetallic, coord);
+    albedo = toLinear(tmp.xyz);
+    metallic = tmp.w;
+  }
+
+  vec3 emissive;
+  float roughness;
+  {
+    vec4 tmp = imageLoad(emissiveRoughness, coord);
+    emissive = toLinear(tmp.xyz);
+    roughness = tmp.w;
+  }
 
   vec3 light = vec3(0);
   vec3 eyeDir = normalize(-pos);
@@ -68,23 +154,32 @@ void main()
   {
     vec3 lightPos = (mView * vec4(lights[i].pos, 1.0)).xyz;
     float lightDist = distance(pos, lightPos);
-    vec3 lightDir = normalize(lightPos - pos);
     float attenuation = 1.0 / (1.0 + attenuationCoef * lightDist * lightDist);
 
-    float diffuse = max(0.0, dot(normal, lightDir));
-    float specular = pow(max(0.0, dot(normal, normalize(lightDir + eyeDir))), lightExponent);
-    light += lights[i].color * lights[i].strength * (diffuse + specular) * attenuation;
+    vec3 lightDir = normalize(lightPos - pos);
+    vec3 bdrf = BRDF(eyeDir, lightDir, normal, metallic, roughness, albedo);
+
+    vec3 L = lights[i].color * lights[i].strength * attenuation;
+
+    light += bdrf * L * max(dot(normal, lightDir), 0.0);
   }
 
   {
     vec3 lightDir = -mat3(mView) * sunlight.dir;
 
-    float diffuse = max(0.0, dot(normal, lightDir));
-    float specular = pow(max(0.0, dot(normal, normalize(lightDir + eyeDir))), lightExponent);
-    light += sunlight.color * sunlight.strength * (diffuse + specular + sunlight.ambient);
+    vec3 L = sunlight.color * sunlight.strength;
+    vec3 bdrf = BRDF(eyeDir, lightDir, normal, metallic, roughness, albedo);
+
+    light += L * bdrf * max(dot(normal, lightDir), 0.0);
   }
 
-  pixel *= light;
+  {
+    light += sunlight.ambient * sunlight.strength * occlusion * albedo;
+  }
 
-  imageStore(albedo, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
+  {
+    light += emissive;
+  }
+
+  storeLight(light, coord);
 }

@@ -174,11 +174,24 @@ static Material getMaterial(const tinygltf::Model& model, int index)
   {
     albedoFactor[i] = material.pbrMetallicRoughness.baseColorFactor[i];
   }
+  glm::vec3 emissiveFactor;
+  for (size_t i = 0; i < 3; ++i)
+  {
+    emissiveFactor[i] = material.emissiveFactor[i];
+  }
   return {
     .albedoIndex = static_cast<uint32_t>(material.pbrMetallicRoughness.baseColorTexture.index),
     .albedoFactor = albedoFactor,
+    .metallicRoughnessIndex =
+      static_cast<uint32_t>(material.pbrMetallicRoughness.metallicRoughnessTexture.index),
+    .metallicFactor = static_cast<float>(material.pbrMetallicRoughness.metallicFactor),
+    .roughnessFactor = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor),
     .normalIndex = static_cast<uint32_t>(material.normalTexture.index),
     .normalScale = static_cast<float>(material.normalTexture.scale),
+    .occlusionIndex = static_cast<uint32_t>(material.occlusionTexture.index),
+    .occlusionStrength = static_cast<float>(material.occlusionTexture.strength),
+    .emissiveIndex = static_cast<uint32_t>(material.emissiveTexture.index),
+    .emissiveFactor = emissiveFactor,
   };
 }
 

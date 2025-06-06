@@ -17,8 +17,15 @@ static MaterialCompat makeCompat(const Material& src)
   return {
     .albedoIndex = src.albedoIndex,
     .normalIndex = src.normalIndex,
+    .emissiveIndex = src.emissiveIndex,
+    .metallicRoughnessIndex = src.metallicRoughnessIndex,
+    .occlusionIndex = src.occlusionIndex,
     .normalScale = src.normalScale,
+    .metallicFactor = src.metallicFactor,
+    .roughnessFactor = src.roughnessFactor,
     .albedoFactor = src.albedoFactor,
+    .emissiveFactor = src.emissiveFactor,
+    .occlusionStrength = src.occlusionStrength,
   };
 }
 
@@ -213,12 +220,19 @@ void StaticMeshRenderer::setupPipelines()
                 .blendEnable = vk::False,
                 .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                   vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+              },
+              vk::PipelineColorBlendAttachmentState{
+                .blendEnable = vk::False,
+                .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
               }},
            .logicOp = vk::LogicOp::eSet},
         .fragmentShaderOutput =
           {
             .colorAttachmentFormats =
-              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eA8B8G8R8SnormPack32},
+              {vk::Format::eA8B8G8R8SrgbPack32,
+               vk::Format::eA8B8G8R8SnormPack32,
+               vk::Format::eA8B8G8R8SrgbPack32},
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });
@@ -259,12 +273,19 @@ void StaticMeshRenderer::setupPipelines()
                 .blendEnable = vk::False,
                 .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                   vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+              },
+              vk::PipelineColorBlendAttachmentState{
+                .blendEnable = vk::False,
+                .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                  vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
               }},
            .logicOp = vk::LogicOp::eSet},
         .fragmentShaderOutput =
           {
             .colorAttachmentFormats =
-              {vk::Format::eB10G11R11UfloatPack32, vk::Format::eA8B8G8R8SnormPack32},
+              {vk::Format::eA8B8G8R8SrgbPack32,
+               vk::Format::eA8B8G8R8SnormPack32,
+               vk::Format::eA8B8G8R8SrgbPack32},
             .depthAttachmentFormat = vk::Format::eD32Sfloat,
           },
       });

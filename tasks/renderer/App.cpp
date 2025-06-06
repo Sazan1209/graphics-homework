@@ -17,7 +17,7 @@ App::App()
 
   auto surface = mainWindow->createVkSurface(etna::get_context().getInstance());
 
-  renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes_baked/Avocado/Avocado_baked.gltf");
+  renderer->loadScene(GRAPHICS_COURSE_RESOURCES_ROOT "/scenes_baked/Boombox/BoomBox_baked.gltf");
   renderer->initFrameDelivery(std::move(surface), [this]() { return mainWindow->getResolution(); });
   ImGuiRenderer::enableImGuiForWindow(mainWindow->native());
 
@@ -55,7 +55,7 @@ void App::processInput(float dt)
   if (is_held_down(mainWindow->keyboard[KeyboardKey::kLeftShift]))
     camMoveSpeed = 10;
   else
-    camMoveSpeed = 1;
+    camMoveSpeed = 0.1;
 
   if (mainWindow->mouse[MouseButton::mbRight] == ButtonState::Rising)
     mainWindow->captureMouse = !mainWindow->captureMouse;
