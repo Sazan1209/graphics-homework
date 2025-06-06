@@ -16,10 +16,17 @@ struct Command{
 struct MaterialCompat{
   shader_uint albedoIndex;
   shader_uint normalIndex;
+  shader_uint emissiveIndex;
+  shader_uint metallicRoughnessIndex;
+  shader_uint occlusionIndex;
   shader_float normalScale;
-  CPU_ONLY(float padding = -1.0;)
+  shader_float metallicFactor;
+  shader_float roughnessFactor;
 
   shader_vec4 albedoFactor;
+  shader_vec3 emissiveFactor;
+  shader_float occlusionStrength;
+
 };
 
 struct SingleREIndirectCommand
@@ -32,7 +39,7 @@ struct SingleREIndirectCommand
   MaterialCompat material;
 };
 
-CPU_ONLY(static_assert(sizeof(SingleREIndirectCommand) == 20 * sizeof(float));)
+CPU_ONLY(static_assert(sizeof(SingleREIndirectCommand) == 28 * sizeof(float));)
 
 struct GroupREIndirectCommand
 {
@@ -42,7 +49,7 @@ struct GroupREIndirectCommand
   Command command;
   MaterialCompat material;
 };
-CPU_ONLY(static_assert(sizeof(GroupREIndirectCommand) == 20 * sizeof(float));)
+CPU_ONLY(static_assert(sizeof(GroupREIndirectCommand) == 28 * sizeof(float));)
 
 struct REInstanceCullingInfo
 {

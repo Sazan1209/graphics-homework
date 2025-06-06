@@ -22,21 +22,18 @@ struct Material
   uint32_t albedoIndex = MISSING_INDEX;
   glm::vec4 albedoFactor = {1.0, 1.0, 1.0, 1.0};
 
-  // uint32_t metallicIndex = MISSING_INDEX;
-  // float metallicFactor = 1.0;
-
-  // uint32_t roughnessIndex = MISSING_INDEX;
-  // float roughnessFactor = 1.0;
+  uint32_t metallicRoughnessIndex = MISSING_INDEX;
+  float metallicFactor = 1.0;
+  float roughnessFactor = 1.0;
 
   uint32_t normalIndex = MISSING_INDEX;
   float normalScale = 1.0;
 
-  // uint32_t occlusionIndex = MISSING_INDEX;
-  // float occlusionStrength;
+  uint32_t occlusionIndex = MISSING_INDEX;
+  float occlusionStrength;
 
-  // uint32_t emissiveIndex = MISSING_INDEX;
-  // glm::vec3 emissiveFactor = {0, 0, 0};
-
+  uint32_t emissiveIndex = MISSING_INDEX;
+  glm::vec3 emissiveFactor = {0, 0, 0};
 
 };
 

@@ -45,9 +45,11 @@ private:
   etna::Image normalMap;
   etna::Buffer lightList;
 
-  struct{
-    etna::Image normal;
-    etna::Image color;
+  struct
+  {
+    etna::Image colorMetallic;
+    etna::Image normalOcclusion;
+    etna::Image emissiveRoughness; // reused as luminances
     etna::Image depth;
   } gBuffer;
 
@@ -74,22 +76,21 @@ private:
     glm::vec3 eye;
   };
 
-
   float sunlightAngles[2] = {30.0f, 0.0f};
   struct
   {
     resolve::Sunlight sunlight = {
       glm::vec3(1.0 / 2, -glm::sqrt(3.0) / 2.0, 0), 0.0, glm::vec3(1, 1, 1), 0.05};
 
-    glm::vec3 skyColor = glm::vec3(135, 206, 235) / 255.0f;
-    float lightExponent = 1.0f;
+    glm::vec3 skyColor = glm::vec3(0, 181, 226) / 255.0f;
+    float near;
 
     glm::mat4 mView;
 
-    float near;
     float far;
     float tanFov;
-    float attenuationCoef = 0.005;
+    float attenuationCoef = 1.0;
+    float padding;
   } resolveUniformParams;
 
   struct

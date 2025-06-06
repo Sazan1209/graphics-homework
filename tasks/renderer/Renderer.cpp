@@ -28,6 +28,7 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
   auto vk12Features = vk::PhysicalDeviceVulkan12Features{
     .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
     .descriptorBindingPartiallyBound = VK_TRUE,
+    .descriptorBindingVariableDescriptorCount = VK_TRUE,
     .runtimeDescriptorArray = VK_TRUE,
   };
 
