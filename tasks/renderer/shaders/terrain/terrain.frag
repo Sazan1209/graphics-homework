@@ -12,7 +12,7 @@ layout(location = 1) out vec4 out_normalOcclusion;
 layout(location = 2) out vec4 out_emissiveRoughness;
 
 const vec3 grass = vec3(0, 154, 23) / 255.0;
-const vec3 dirt = vec3(155, 118, 83) / 255.0;
+const vec3 dirt = vec3(58, 44, 31) / 255.0;
 const float degree = 0.7;
 
 void main()

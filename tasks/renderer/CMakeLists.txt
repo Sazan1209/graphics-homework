@@ -8,6 +8,7 @@ add_executable(complete_renderer
   WorldRenderer.cpp
   StaticMeshRenderer.cpp
   TerrainGenerator.cpp
+  GrassRenderer.cpp
 )
 
 target_link_libraries(complete_renderer
@@ -40,4 +41,7 @@ target_add_shaders(complete_renderer
 
   shaders/cube.frag
   shaders/cube.vert
+
+  shaders/grass/grass.frag
+  shaders/grass/grass.vert
 )

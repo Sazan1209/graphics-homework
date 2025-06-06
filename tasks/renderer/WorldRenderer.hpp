@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "StaticMeshRenderer.hpp"
+#include "GrassRenderer.hpp"
 #include "wsi/Keyboard.hpp"
 
 #include "FramePacket.hpp"
@@ -40,6 +41,7 @@ private:
 
 private:
   StaticMeshRenderer staticRenderer;
+  GrassRenderer grassRenderer;
 
   etna::Image heightMap;
   etna::Image normalMap;
