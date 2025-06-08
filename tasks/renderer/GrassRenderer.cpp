@@ -146,11 +146,15 @@ void GrassRenderer::drawGui()
   if (ImGui::CollapsingHeader("Grass"))
   {
     ImGui::InputFloat("Bend", &renderPc.bend);
-    ImGui::InputFloat2("Facing", &renderPc.facing[0]);
     ImGui::InputFloat("Height", &renderPc.height);
     ImGui::InputFloat("Middle point", &renderPc.midCoef);
     ImGui::InputFloat("Tilt", &renderPc.tilt);
     ImGui::InputFloat("Width", &renderPc.width);
     ImGui::InputFloat("Jitter", &renderPc.jitterCoef);
+    ImGui::InputFloat("Force align", &renderPc.alignCoef);
+  }
+  if (ImGui::CollapsingHeader("Grass Gen"))
+  {
+    ImGui::InputFloat("Grass position jitter", &genPc.maxJitter);
   }
 }
