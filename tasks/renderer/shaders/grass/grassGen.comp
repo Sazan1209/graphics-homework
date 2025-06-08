@@ -13,6 +13,7 @@ layout(push_constant, std430) uniform grassvert_pc
 {
   mat4 VfW;
   vec3 eyePos;
+  float maxJitter;
 };
 
 // grass position and facing generation
@@ -64,17 +65,24 @@ vec3 getWfM(vec3 mPos){
 
 void main(){
   vec2 mEye = getMfW(eyePos.xz);
-
   ivec2 iPos = findFirstGrassID(mEye) + ivec2(gl_GlobalInvocationID.xy);
-  vec2 mPos2D = getMfI(iPos); // todo add jitter
-  vec2 tPos = getTfM(mPos2D);
-  float height = texture(perlinNoise, tPos).x;
-  vec3 mPos3D = vec3(mPos2D, height).xzy;
-  vec3 wPos3D = getWfM(mPos3D);
 
   const uint index =
     gl_GlobalInvocationID.y * gl_NumWorkGroups.x +
     gl_GlobalInvocationID.x;
+  uint n = (iPos.y * 7) ^ (iPos.x);
+  vec2 jitter = (vec2(rand(n), rand(n)) - 0.5) * maxJitter;
+
+  vec2 mPos2D = getMfI(iPos) + jitter;
+  vec2 tPos = getTfM(mPos2D);
+  float height = texture(perlinNoise, tPos).x;
+
+
+
+  vec3 mPos3D = vec3(mPos2D, height).xzy;
+  vec3 wPos3D = getWfM(mPos3D);
 
   blades[index].pos = wPos3D;
+  blades[index].facing = rand(n) * 2.0 * PI;
+  blades[index].hash = n;
 }

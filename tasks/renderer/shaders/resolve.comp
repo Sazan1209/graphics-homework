@@ -127,7 +127,7 @@ void main()
   float occlusion;
   {
     vec4 tmp = imageLoad(normalOcclusion, coord);
-    normal = mat3(mView) * tmp.xyz;
+    normal = normalize(mat3(mView) * tmp.xyz);
     occlusion = tmp.w;
   }
 

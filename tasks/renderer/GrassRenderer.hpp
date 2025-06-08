@@ -19,6 +19,7 @@ public:
   void update(glm::mat4 matrDfW_, float time_, glm::vec3 eyePos_)
   {
     renderPc.mDfW = matrDfW_;
+    renderPc.eyePos = eyePos_;
     renderPc.time = time_;
     genPc.mDfW = matrDfW_;
     genPc.eyePos = eyePos_;
@@ -31,19 +32,21 @@ private:
   struct RenderPushConst
   {
     glm::mat4 mDfW;
-    glm::vec2 facing = {1.0, 0};
+    glm::vec3 eyePos;
     float bend = .5;
     float tilt = glm::radians(30.0);
-    float width = .01;
-    float height = .05;
+    float width = 0.01;
+    float height = 0.3;
     float midCoef = 3.0 / 4.0;
     float time = 0.0;
-    float jitterCoef = 0.5;
+    float jitterCoef = 0.2;
+    float alignCoef = 0.05;
   } renderPc;
 
   struct GenPushConst{
     glm::mat4 mDfW;
     glm::vec3 eyePos;
+    float maxJitter = 0.1;
   } genPc;
 
   etna::GraphicsPipeline grassRenderPipeline;

@@ -48,7 +48,7 @@ TerrainGenerator::TerrainInfo TerrainGenerator::generate()
     .imageUsage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage});
 
   res.lightList = ctx.createBuffer(etna::Buffer::CreateInfo{
-    .size = sizeof(resolve::PointLight) * 64,
+    .size = sizeof(resolve::PointLight) * 32,
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
     .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
     .name = "light_list",
