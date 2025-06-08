@@ -4,6 +4,7 @@
 #include <etna/Image.hpp>
 #include <etna/Buffer.hpp>
 #include <etna/ComputePipeline.hpp>
+#include <etna/Sampler.hpp>
 #include <glm/glm.hpp>
 
 class TerrainGenerator
@@ -19,7 +20,6 @@ public:
   TerrainInfo generate();
 
 private:
-
   etna::ComputePipeline perlinPipeline{};
   etna::ComputePipeline normalPipeline{};
   etna::ComputePipeline lightgenPipeline{};
@@ -27,6 +27,8 @@ private:
   void createTerrainMap(vk::CommandBuffer cmd_buf, TerrainInfo& info);
   void loadShaders();
   void setupPipelines();
+  etna::Sampler sampler{
+    etna::Sampler::CreateInfo{.filter = vk::Filter::eLinear, .name = "perlinSampler"}};
 };
 
 #endif // TERRAINGENERATOR_HPP

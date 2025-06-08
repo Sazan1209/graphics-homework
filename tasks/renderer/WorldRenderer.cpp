@@ -14,6 +14,7 @@
 void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
 {
   resolution = swapchain_resolution;
+  grassRenderer.allocateResources();
 
   auto& ctx = etna::get_context();
   defaultSampler = etna::Sampler(
@@ -223,7 +224,7 @@ void WorldRenderer::update(const FramePacket& packet)
     eye = packet.mainCam.position;
   }
   staticRenderer.update(worldViewProj);
-  grassRenderer.update(worldViewProj, packet.currentTime);
+  grassRenderer.update(worldViewProj, packet.currentTime, packet.mainCam.position);
 }
 
 void WorldRenderer::drawGui()
@@ -268,6 +269,7 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
 {
   ETNA_PROFILE_GPU(cmd_buf, renderWorld);
   staticRenderer.prepareForRender(cmd_buf);
+  grassRenderer.prepareForRender(cmd_buf, heightMap);
   {
     ETNA_PROFILE_GPU(cmd_buf, renderForward);
     etna::set_state(

@@ -7,6 +7,7 @@
 #include <etna/Profiling.hpp>
 #include <etna/Sampler.hpp>
 #include <etna/OneShotCmdMgr.hpp>
+#include <etna/DescriptorSet.hpp>
 
 TerrainGenerator::TerrainGenerator()
 {
@@ -69,10 +70,6 @@ TerrainGenerator::TerrainInfo TerrainGenerator::generate()
 
 void TerrainGenerator::createTerrainMap(vk::CommandBuffer cmd_buf, TerrainInfo& res)
 {
-
-
-  etna::Sampler sampler{
-    etna::Sampler::CreateInfo{.filter = vk::Filter::eLinear, .name = "perlinSampler"}};
 
   etna::set_state(
     cmd_buf,
