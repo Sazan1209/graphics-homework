@@ -1,18 +1,24 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
+#include "grass.glsl"
+
 layout(push_constant, std430) uniform grassvert_pc
 {
   mat4 mDfW;
-  vec3 wPos;
-  float bend;
   vec2 facing;
+  float bend;
   float tilt;
   float width;
   float height;
   float midCoef;
   float time;
   float jitterCoef;
+};
+
+layout(binding = 0, std430) restrict readonly buffer grass_vert_buf0
+{
+  GrassInstanceData blades[];
 };
 
 layout(location = 0) out vec3 out_normal;
@@ -73,7 +79,7 @@ void main()
     side = vec3(ort, 0).xzy;
   }
   out_normal = normalize(cross(side, grad));
-  vec3 point = bezierEval(start, mid, end, t) + side * widthLerp + wPos;
+  vec3 point = bezierEval(start, mid, end, t) + side * widthLerp + blades[gl_InstanceIndex].pos;
   gl_Position = mDfW * vec4(point, 1.0);
   // out_t = t;
 }

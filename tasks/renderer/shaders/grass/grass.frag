@@ -7,7 +7,7 @@ layout(location = 0) out vec4 out_colorMetallic;
 layout(location = 1) out vec4 out_normalOcclusion;
 layout(location = 2) out vec4 out_emissiveRoughness;
 
-const vec3 grass = vec3(0, 154, 23) / 255.0;
+const vec3 grass = vec3(0, 154, 23) / 300.0;
 
 void main(){
   out_colorMetallic.xyz = grass;

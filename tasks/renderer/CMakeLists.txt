@@ -44,4 +44,5 @@ target_add_shaders(complete_renderer
 
   shaders/grass/grass.frag
   shaders/grass/grass.vert
+  shaders/grass/grassGen.comp
 )
