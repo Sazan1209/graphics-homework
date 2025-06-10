@@ -48,10 +48,8 @@ vec2 orth(vec2 v){
   return v;
 }
 
-vec2 align(vec2 val, vec2 dir){
-  vec2 dirOrt = orth(dir);
-  val -= dot(dirOrt, val) * dirOrt * alignCoef / dot(dirOrt, dirOrt);
-  return normalize(val);
+vec3 align(vec3 val, vec3 dir){
+  return val - dot(val, dir) * dir * alignCoef;
 }
 
 void main()
@@ -59,11 +57,9 @@ void main()
   uint vInd = gl_VertexIndex;
   GrassInstanceData blade = blades[gl_InstanceIndex];
   uint n = blade.hash;
-  vec3 pToEye = eyePos - blade.pos;
+  vec3 pToEye = normalize(eyePos - blade.pos);
 
   vec2 facing = vec2(sin(blade.facing), cos(blade.facing));
-  facing = align(facing, pToEye.xz);
-
   float jitter = (sin(time + rand(n) * 3.14 * 2) + 1.0) * jitterCoef;
 
   // determine start mid end
@@ -89,8 +85,11 @@ void main()
   vec3 grad = bezierGrad(start, mid, end, t);
   // + or - depending on xInd
   vec3 side = vec3(orth(facing), 0).xzy;
+  side = align(side, pToEye);
+  vec3 normal = normalize(cross(side, grad));
+
   vec3 point = bezierEval(start, mid, end, t) + side * widthLerp + blade.pos;
-  vec3 normal = cross(side, grad);
+  normal = mix(normal, side * (float(xInd) * 2.0 - 1.0), 0.2);
   out_normal = normalize(normal);
   gl_Position = mDfW * vec4(point, 1.0);
   // out_t = t;

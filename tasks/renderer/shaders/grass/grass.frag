@@ -12,8 +12,8 @@ const vec3 grass = vec3(0, 154, 23) / 300.0;
 void main(){
   out_colorMetallic.xyz = grass;
   out_colorMetallic.w = 0.0;
-  out_normalOcclusion.xyz = in_normal;
-  out_normalOcclusion.w = 0.0;
+  out_normalOcclusion.xyz = gl_FrontFacing ? in_normal : -in_normal;
+  out_normalOcclusion.w = 1.0;
   out_emissiveRoughness.xyz = vec3(0);
-  out_emissiveRoughness.w = 1.0;
+  out_emissiveRoughness.w = 0.0;
 }

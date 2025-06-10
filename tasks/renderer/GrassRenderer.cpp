@@ -20,10 +20,12 @@ void GrassRenderer::loadShaders()
 void GrassRenderer::allocateResources()
 {
   ZoneScoped;
+  uint32_t count =
+    grass::centerGrassCount.x * grass::centerGrassCount.y * (4 + grass::ringCount * 3) / 4;
   grassInstanceData = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
-    .size = grass::drawnGrassCount.x * grass::drawnGrassCount.y * sizeof(grass::GrassInstanceData),
+    .size = count * sizeof(grass::GrassInstanceData),
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
-    .memoryUsage = VMA_MEMORY_USAGE_CPU_COPY,
+    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
     .name = "grass_instance_data"});
 }
 
@@ -78,17 +80,25 @@ void GrassRenderer::setupPipelines()
 
 void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& heightMap)
 {
+  ETNA_PROFILE_GPU(cmd_buf, generate_grass);
   etna::set_state(
     cmd_buf,
     grassInstanceData.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite);
   etna::flush_barriers(cmd_buf);
+  for (uint32_t i = 0, offset = 0; i <= grass::ringCount; ++i)
   {
+    uint32_t range = grass::centerGrassCount.x * grass::centerGrassCount.y;
+    if (i != 0)
+    {
+      range = range * 3 / 4;
+    }
     auto info = etna::get_shader_program("generate_grass");
     auto binding0 =
       heightMap.genBinding(sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {});
-    auto binding1 = grassInstanceData.genBinding();
+    auto binding1 = grassInstanceData.genBinding(offset, range * sizeof(grass::GrassInstanceData));
+    offset += range * sizeof(grass::GrassInstanceData);
 
     auto set = etna::create_descriptor_set(
       info.getDescriptorLayoutId(0),
@@ -105,9 +115,10 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline.getVkPipeline());
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eCompute, pipeline.getVkPipelineLayout(), 0, {vkSet}, {});
+    genPc.ring = i;
     cmd_buf.pushConstants<GenPushConst>(layout, vk::ShaderStageFlagBits::eCompute, 0, genPc);
 
-    cmd_buf.dispatch(grass::drawnGrassCount.x, grass::drawnGrassCount.y, 1);
+    cmd_buf.dispatch(range / 64, 1, 1);
   }
   etna::set_state(
     cmd_buf,
@@ -119,26 +130,36 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
 void GrassRenderer::renderScene(vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, render_grass);
-  auto info = etna::get_shader_program("render_grass");
-  auto binding0 = grassInstanceData.genBinding();
-
-  auto set = etna::create_descriptor_set(
-    info.getDescriptorLayoutId(0),
-    cmd_buf,
+  float oldWidth = renderPc.width;
+  for (uint32_t i = 0, offset = 0; i <= grass::ringCount; ++i, renderPc.width *= 2.0f)
+  {
+    uint32_t count = grass::centerGrassCount.x * grass::centerGrassCount.y;
+    if (i != 0)
     {
-      etna::Binding{0, binding0},
-    });
+      count = count * 3 / 4;
+    }
+    auto info = etna::get_shader_program("render_grass");
+    auto binding0 = grassInstanceData.genBinding(offset, count * sizeof(grass::GrassInstanceData));
+    offset += count * sizeof(grass::GrassInstanceData);
+    auto set = etna::create_descriptor_set(
+      info.getDescriptorLayoutId(0),
+      cmd_buf,
+      {
+        etna::Binding{0, binding0},
+      });
 
-  vk::DescriptorSet vkSet = set.getVkSet();
-  auto layout = grassRenderPipeline.getVkPipelineLayout();
-  auto& pipeline = grassRenderPipeline;
+    vk::DescriptorSet vkSet = set.getVkSet();
+    auto layout = grassRenderPipeline.getVkPipelineLayout();
+    auto& pipeline = grassRenderPipeline;
 
-  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
-  cmd_buf.bindDescriptorSets(
-    vk::PipelineBindPoint::eGraphics, pipeline.getVkPipelineLayout(), 0, {vkSet}, {});
+    cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
+    cmd_buf.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics, pipeline.getVkPipelineLayout(), 0, {vkSet}, {});
 
-  cmd_buf.pushConstants<RenderPushConst>(layout, vk::ShaderStageFlagBits::eVertex, 0, renderPc);
-  cmd_buf.draw(15, grass::drawnGrassCount.x * grass::drawnGrassCount.y, 0, 0);
+    cmd_buf.pushConstants<RenderPushConst>(layout, vk::ShaderStageFlagBits::eVertex, 0, renderPc);
+    cmd_buf.draw(15, count, 0, 0);
+  }
+  renderPc.width = oldWidth;
 }
 
 void GrassRenderer::drawGui()
