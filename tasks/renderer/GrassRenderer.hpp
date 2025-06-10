@@ -33,20 +33,21 @@ private:
   {
     glm::mat4 mDfW;
     glm::vec3 eyePos;
-    float bend = .5;
-    float tilt = glm::radians(30.0);
-    float width = 0.01;
-    float height = 0.3;
+    float bend = .2;
+    float tilt = glm::radians(15.0);
+    float width = 0.02;
+    float height = 0.6;
     float midCoef = 3.0 / 4.0;
     float time = 0.0;
-    float jitterCoef = 0.2;
-    float alignCoef = 0.05;
+    float jitterCoef = 0.1;
+    float alignCoef = 0.7;
   } renderPc;
 
   struct GenPushConst{
     glm::mat4 mDfW;
     glm::vec3 eyePos;
     float maxJitter = 0.1;
+    uint ring;
   } genPc;
 
   etna::GraphicsPipeline grassRenderPipeline;

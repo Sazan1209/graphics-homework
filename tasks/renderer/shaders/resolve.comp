@@ -92,7 +92,7 @@ vec3 BRDF(vec3 v, vec3 l, vec3 n, float metallic, float roughness, vec3 albedo){
 
 void storeLight(vec3 light, ivec2 coord){
   float brightnessVal = dot(light, lumVec);
-  vec3 colorVal = light / brightnessVal;
+  vec3 colorVal = light / max(brightnessVal, 0.0001);
   imageStore(color, coord, vec4(fromLinear(colorVal), 1.0));
   imageStore(brightness, coord, vec4(brightnessVal));
 }
@@ -127,6 +127,10 @@ void main()
   float occlusion;
   {
     vec4 tmp = imageLoad(normalOcclusion, coord);
+    if (tmp.xyz == vec3(0, 0, 0)){
+      storeLight(skyColor * sunlight.strength / 5.0, coord);
+      return;
+    }
     normal = normalize(mat3(mView) * tmp.xyz);
     occlusion = tmp.w;
   }

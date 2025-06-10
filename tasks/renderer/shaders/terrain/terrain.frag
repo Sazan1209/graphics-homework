@@ -21,7 +21,7 @@ void main()
   // Model to World translation
   wNorm.z = -wNorm.z;
 
-  const vec3 surfaceColor = wNorm.y >= degree ? grass : dirt;
+  const vec3 surfaceColor = wNorm.y >= degree ? grass : grass;
 
   out_colorMetallic.rgb = surfaceColor;
   out_colorMetallic.a = 0.0f;

@@ -91,7 +91,7 @@ private:
 
     float far;
     float tanFov;
-    float attenuationCoef = 1.0;
+    float attenuationCoef = 0.05;
     float padding;
   } resolveUniformParams;
 
