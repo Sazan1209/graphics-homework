@@ -23,7 +23,9 @@ layout(binding = 0, std430) restrict readonly buffer grass_vert_buf0
 };
 
 layout(location = 0) out vec3 out_normal;
-// layout(location = 1) out float out_t;
+layout(location = 1) out float out_t;
+layout(location = 2) out float out_x;
+
 
 vec3 bezierEval(vec3 start, vec3 mid, vec3 end, float t){
   float t1 = 1.0 - t;
@@ -68,7 +70,7 @@ void main()
   vec3 end;
   {
     vec2 start2d = vec2(0.0);
-    float tiltJitter = tilt + jitter;
+    float tiltJitter = (tilt + jitter) * PI / 2.0;
     float tiltMidCoef = midCoef - jitter / 5.0;
     vec2 end2d = height * vec2(sin(tiltJitter), cos(tiltJitter));
     vec2 mid2d = mix(start2d, end2d, tiltMidCoef);
@@ -80,17 +82,18 @@ void main()
   }
   uint yInd = vInd / 2;
   uint xInd = vInd % 2;
-  float t = 1.0 / 7.0 * float(yInd);
-  float widthLerp = mix(width, 0.0, t) * (float(xInd) * 2.0 - 1.0);
+  float t = (1.0 / 7.0 * float(yInd));
+  float x = yInd == 7 ? 0.0 : (float(xInd) * 2.0 - 1.0);
+  float widthLerp = mix(0.0, width,  1.0 - t * t) * x;
   vec3 grad = bezierGrad(start, mid, end, t);
-  // + or - depending on xInd
   vec3 side = vec3(orth(facing), 0).xzy;
   side = align(side, pToEye);
   vec3 normal = normalize(cross(side, grad));
 
   vec3 point = bezierEval(start, mid, end, t) + side * widthLerp + blade.pos;
-  normal = mix(normal, side * (float(xInd) * 2.0 - 1.0), 0.2);
+  normal = mix(normal, side * x, 0.2);
   out_normal = normalize(normal);
   gl_Position = mDfW * vec4(point, 1.0);
-  // out_t = t;
+  out_t = t;
+  out_x = x;
 }

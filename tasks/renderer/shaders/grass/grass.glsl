@@ -8,7 +8,7 @@ const vec3 centerCoordWorld = vec3(0, -5.0, 0);
 #define PI 3.1415926538
 
 // the size of the square around the player in which grass is rendered;
-const vec2 centerSize = vec2(16, 16);
+const vec2 centerSize = vec2(32, 32);
 const vec2 grassPerMeter = vec2(centerGrassCount) / centerSize;
 
 const vec2 totalGrassCount = terrainSize * grassPerMeter;
