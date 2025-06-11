@@ -21,12 +21,12 @@ void main()
   // Model to World translation
   wNorm.z = -wNorm.z;
 
-  const vec3 surfaceColor = wNorm.y >= degree ? grass : grass;
+  const vec3 surfaceColor = wNorm.y >= degree ? grass : dirt;
 
   out_colorMetallic.rgb = surfaceColor;
   out_colorMetallic.a = 0.0f;
   out_normalOcclusion.xyz = wNorm.xyz;
-  out_normalOcclusion.w = 1.0f;
+  out_normalOcclusion.w = wNorm.y >= degree ? 0.0f : 1.0f;
   out_emissiveRoughness.xyz = vec3(0);
-  out_emissiveRoughness.w = 1.0f;
+  out_emissiveRoughness.w = wNorm.y >= degree ? 0.85f : 1.0f;
 }

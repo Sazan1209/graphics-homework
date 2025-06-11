@@ -2,7 +2,7 @@
 
 const vec2 terrainSize = vec2(1024, 1024);
 const vec2 squareSize = terrainSize / vec2(gridSize);
-const float zScale = 20.0; // The terrain height will range from -200 to 200
+const float zScale = 100.0; // The terrain height will range from -200 to 200
 const vec3 centerCoordModel = vec3(terrainSize / 2.0, 0).xzy;
 
 const vec3 centerCoordWorld = vec3(0, -5, 0);

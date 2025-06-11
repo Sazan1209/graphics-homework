@@ -82,7 +82,7 @@ private:
   struct
   {
     resolve::Sunlight sunlight = {
-      glm::vec3(1.0 / 2, -glm::sqrt(3.0) / 2.0, 0), 0.0, glm::vec3(1, 1, 1), 0.05};
+      glm::vec3(1.0 / 2, -glm::sqrt(3.0) / 2.0, 0), 1.0, glm::vec3(1, 1, 1), 0.05};
 
     glm::vec3 skyColor = glm::vec3(0, 181, 226) / 255.0f;
     float near;

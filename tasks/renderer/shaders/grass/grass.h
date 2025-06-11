@@ -13,7 +13,7 @@ struct GrassInstanceData
   CPU_ONLY(float padding[3];)
 };
 
-const shader_uint ringCount = 4;
+const shader_uint ringCount = 2;
 const shader_uvec2 centerGrassCount = shader_uvec2(256, 256);
 
 SHADER_NAMESPACE_END
