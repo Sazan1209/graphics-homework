@@ -10,7 +10,21 @@ struct GrassInstanceData
   shader_vec3 pos;
   shader_float facing;
   shader_uint hash;
-  CPU_ONLY(float padding[3];)
+  shader_float lod;
+  CPU_ONLY(float padding[2];)
+};
+
+struct Command
+{
+  shader_uint vertexCount;
+  shader_uint instanceCount;
+  shader_uint firstVertex;
+  shader_uint firstInstance;
+};
+
+struct GrassDrawCallData
+{
+  Command comm;
 };
 
 const shader_uint ringCount = 2;

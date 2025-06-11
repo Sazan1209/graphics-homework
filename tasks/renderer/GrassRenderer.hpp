@@ -48,11 +48,14 @@ private:
     glm::vec3 eyePos;
     float maxJitter = 0.1;
     uint ring;
+    float tilt;
+    float height;
   } genPc;
 
   etna::GraphicsPipeline grassRenderPipeline;
   etna::ComputePipeline grassGenPipeline;
   etna::Buffer grassInstanceData;
+  etna::Buffer grassDrawcallData;
   etna::Sampler sampler{
     etna::Sampler::CreateInfo{.filter = vk::Filter::eLinear, .name = "grass_sampler"}};
 };

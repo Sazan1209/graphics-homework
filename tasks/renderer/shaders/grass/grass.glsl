@@ -13,10 +13,9 @@ const vec2 grassPerMeter = vec2(centerGrassCount) / centerSize;
 
 const vec2 totalGrassCount = terrainSize * grassPerMeter;
 
-
-
 float rand(inout uint n)
 {
   n *= 43758;
   return fract(sin(n % 4096));
 }
+

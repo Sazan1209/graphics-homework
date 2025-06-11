@@ -1,6 +1,8 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
+#include "../utils.glsl"
+
 layout(location = 0) in vec3 in_normal;
 layout(location = 1) in float in_t;
 layout(location = 2) in float in_x;
@@ -12,7 +14,7 @@ layout(location = 2) out vec4 out_emissiveRoughness;
 const vec3 grass = vec3(0, 154, 23) / 255.0;
 
 void main(){
-  out_colorMetallic.xyz = grass;
+  out_colorMetallic.xyz = toLinear(grass);
   out_colorMetallic.w = 0.0;
   out_normalOcclusion.xyz = gl_FrontFacing ? in_normal : -in_normal;
   out_normalOcclusion.w = mix(0.3, 1.0, in_t);

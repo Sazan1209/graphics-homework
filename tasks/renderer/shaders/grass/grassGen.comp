@@ -15,8 +15,10 @@ layout(push_constant, std430) uniform grassvert_pc
 {
   mat4 VfW;
   vec3 eyePos;
-  float maxJitter;
+  float maxRandomOffset;
   uint ring;
+  float tilt;
+  float grassHeight;
 };
 
 // grass position and facing generation
@@ -28,6 +30,10 @@ layout(binding = 0) uniform sampler2D perlinNoise;
 layout(binding = 1, std430) restrict writeonly buffer grass_gen_buf1
 {
   GrassInstanceData blades[];
+};
+layout(binding = 2, std430) buffer grass_gen_buf2
+{
+  GrassDrawCallData drawcall;
 };
 
 // Model coordinates from world
@@ -99,7 +105,7 @@ void main()
   ivec2 iPos = findFirstGrassID(mEye) + (getRfIndex(index) << ring);
 
   uint n = (iPos.y * 7) ^ (iPos.x);
-  vec2 jitter = (vec2(rand(n), rand(n)) - 0.5) * maxJitter;
+  vec2 jitter = (vec2(rand(n), rand(n)) - 0.5) * maxRandomOffset;
 
   vec2 mPos2D = getMfI(iPos) + jitter;
   vec2 tPos = getTfM(mPos2D);
@@ -108,11 +114,35 @@ void main()
   vec3 mPos3D = vec3(mPos2D, height).xzy;
   vec3 wPos3D = getWfM(mPos3D);
 
-  GrassInstanceData blade;
+  if (index == 0){
+    drawcall.comm.vertexCount = 15;
+  }
 
+  GrassInstanceData blade;
   blade.pos = wPos3D;
   blade.facing = rand(n) * 2.0 * PI;
   blade.hash = n;
 
-  blades[index] = blade;
+  {
+    bool curr = false;
+    float angle = tilt * PI / 2.0;
+    vec2 facing = vec2(sin(blade.facing), cos(blade.facing));
+    vec3 offset = vec3(facing * sin(angle), cos(angle)).xzy * grassHeight;
+
+    vec4 p = VfW * vec4(wPos3D, 1.0);
+    p /= p.w + grassHeight;
+    curr = curr || all(greaterThan(p.xyz, vec3(-1, -1, 0))) && all(lessThan(p.xyz, vec3(1, 1, 1)));
+
+    p = VfW * vec4(wPos3D + offset, 1.0);
+    p /= p.w + grassHeight;
+    curr = curr || all(greaterThan(p.xyz, vec3(-1, -1, 0))) && all(lessThan(p.xyz, vec3(1, 1, 1)));
+
+    if (!curr)
+    {
+      return;
+    }
+  }
+
+  uint writeIndex = atomicAdd(drawcall.comm.instanceCount, 1);
+  blades[writeIndex] = blade;
 }
