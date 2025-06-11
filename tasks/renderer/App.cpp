@@ -3,6 +3,63 @@
 #include <tracy/Tracy.hpp>
 #include "gui/ImGuiRenderer.hpp"
 
+static glm::vec2 randomGradient(glm::ivec2 coord)
+{
+  const uint w = 32u;
+  const uint s = w / 2u; // rotation width
+  uint a = uint(coord.x);
+  uint b = uint(coord.y);
+  a *= 3284157443u;
+  b ^= a << s | a >> (w - s);
+  b *= 1911520717u;
+  a ^= b << s | b >> (w - s);
+  a *= 2048419325u;
+  float random = float(a) * (3.14159265 / float(~(~0u >> 1u))); // in [0, 2*Pi]
+  glm::vec2 v;
+  v.x = glm::cos(random);
+  v.y = glm::sin(random);
+  return v;
+}
+
+static float dotGridGradient(glm::vec2 pixCoord, glm::ivec2 gridCoord)
+{
+  glm::vec2 gradient = randomGradient(gridCoord);
+  glm::vec2 offset = pixCoord - glm::vec2(gridCoord);
+
+  return glm::dot(offset, gradient);
+}
+
+static float perlin(glm::vec2 pixCoord)
+{
+  int x0 = int(glm::floor(pixCoord.x));
+  int x1 = x0 + 1;
+  int y0 = int(glm::floor(pixCoord.y));
+  int y1 = y0 + 1;
+
+  glm::vec2 s = pixCoord - glm::vec2(x0, y0);
+  s = (3.0f - s * 2.0f) * s * s;
+
+  float n0 = dotGridGradient(pixCoord, glm::ivec2(x0, y0));
+  float n1 = dotGridGradient(pixCoord, glm::ivec2(x1, y0));
+  float ix0 = glm::mix(n0, n1, s.x);
+
+  n0 = dotGridGradient(pixCoord, glm::ivec2(x0, y1));
+  n1 = dotGridGradient(pixCoord, glm::ivec2(x1, y1));
+  float ix1 = glm::mix(n0, n1, s.x);
+
+  return glm::mix(ix0, ix1, s.y);
+}
+
+static float calc_terrain_height(glm::vec2 position)
+{
+  position.y = -position.y;
+  position += glm::vec2(512.0f, 512.0f);
+  position *= 4.0f;
+  float res = glm::mix(perlin(position / 1024.0f), perlin(position / 128.0f), 0.01f);
+  res = glm::mix(res, perlin(position / 16.0f), 0.005f);
+  return res * 2.0f * 100.0f - 5.0f + 1.8f;
+}
+
 App::App()
 {
   glm::uvec2 initialRes = {1280, 720};
@@ -61,6 +118,7 @@ void App::processInput(float dt)
     mainWindow->captureMouse = !mainWindow->captureMouse;
 
   moveCam(mainCam, mainWindow->keyboard, dt);
+  mainCam.position.y = calc_terrain_height({mainCam.position.x, mainCam.position.z});
   if (mainWindow->captureMouse)
     rotateCam(mainCam, mainWindow->mouse, dt);
 
