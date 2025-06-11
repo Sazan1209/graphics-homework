@@ -27,6 +27,12 @@ void GrassRenderer::allocateResources()
     .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer,
     .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
     .name = "grass_instance_data"});
+  grassDrawcallData = etna::get_context().createBuffer(etna::Buffer::CreateInfo{
+    .size = (grass::ringCount + 1) * sizeof(grass::GrassDrawCallData),
+    .bufferUsage = vk::BufferUsageFlagBits::eStorageBuffer |
+      vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
+    .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+    .name = "grass_drawcall_data"});
 }
 
 void GrassRenderer::setupPipelines()
@@ -86,7 +92,20 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
     grassInstanceData.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
     vk::AccessFlagBits2::eShaderStorageWrite);
+  etna::set_state(
+    cmd_buf,
+    grassDrawcallData.get(),
+    vk::PipelineStageFlagBits2::eTransfer,
+    vk::AccessFlagBits2::eTransferWrite);
   etna::flush_barriers(cmd_buf);
+  cmd_buf.fillBuffer(grassDrawcallData.get(), 0, VK_WHOLE_SIZE, 0);
+  etna::set_state(
+    cmd_buf,
+    grassDrawcallData.get(),
+    vk::PipelineStageFlagBits2::eComputeShader,
+    vk::AccessFlagBits2::eShaderStorageRead | vk::AccessFlagBits2::eShaderStorageWrite);
+  etna::flush_barriers(cmd_buf);
+
   for (uint32_t i = 0, offset = 0; i <= grass::ringCount; ++i)
   {
     uint32_t range = grass::centerGrassCount.x * grass::centerGrassCount.y;
@@ -98,6 +117,8 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
     auto binding0 =
       heightMap.genBinding(sampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {});
     auto binding1 = grassInstanceData.genBinding(offset, range * sizeof(grass::GrassInstanceData));
+    auto binding2 = grassDrawcallData.genBinding(
+      i * sizeof(grass::GrassDrawCallData), sizeof(grass::GrassDrawCallData));
     offset += range * sizeof(grass::GrassInstanceData);
 
     auto set = etna::create_descriptor_set(
@@ -106,6 +127,7 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
       {
         etna::Binding{0, binding0},
         etna::Binding{1, binding1},
+        etna::Binding{2, binding2},
       });
 
     vk::DescriptorSet vkSet = set.getVkSet();
@@ -116,6 +138,8 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eCompute, pipeline.getVkPipelineLayout(), 0, {vkSet}, {});
     genPc.ring = i;
+    genPc.height = renderPc.height;
+    genPc.tilt = renderPc.tilt;
     cmd_buf.pushConstants<GenPushConst>(layout, vk::ShaderStageFlagBits::eCompute, 0, genPc);
 
     cmd_buf.dispatch(range / 64, 1, 1);
@@ -125,6 +149,11 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
     grassInstanceData.get(),
     vk::PipelineStageFlagBits2::eVertexShader,
     vk::AccessFlagBits2::eShaderStorageRead);
+  etna::set_state(
+    cmd_buf,
+    grassDrawcallData.get(),
+    vk::PipelineStageFlagBits2::eDrawIndirect,
+    vk::AccessFlagBits2::eIndirectCommandRead);
 }
 
 void GrassRenderer::renderScene(vk::CommandBuffer cmd_buf)
@@ -155,9 +184,9 @@ void GrassRenderer::renderScene(vk::CommandBuffer cmd_buf)
     cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.getVkPipeline());
     cmd_buf.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics, pipeline.getVkPipelineLayout(), 0, {vkSet}, {});
-
     cmd_buf.pushConstants<RenderPushConst>(layout, vk::ShaderStageFlagBits::eVertex, 0, renderPc);
-    cmd_buf.draw(15, count, 0, 0);
+
+    cmd_buf.drawIndirect(grassDrawcallData.get(), i * sizeof(grass::GrassDrawCallData), 1, 0);
   }
   renderPc.width = oldWidth;
 }

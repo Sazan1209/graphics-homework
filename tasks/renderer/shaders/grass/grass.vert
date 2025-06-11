@@ -51,23 +51,20 @@ vec2 orth(vec2 v){
 }
 
 vec3 align(vec3 val, vec3 dir){
-  return val - dot(val, dir) * dir * alignCoef;
+  return normalize(val - dot(val, dir) * dir * alignCoef);
 }
 
 void main()
 {
-  uint vInd = gl_VertexIndex;
   GrassInstanceData blade = blades[gl_InstanceIndex];
+
   uint n = blade.hash;
   vec3 pToEye = normalize(eyePos - blade.pos);
-
   vec2 facing = vec2(sin(blade.facing), cos(blade.facing));
   float jitter = (sin(time + rand(n) * 3.14 * 2) + 1.0) * jitterCoef;
 
   // determine start mid end
-  vec3 start;
-  vec3 mid;
-  vec3 end;
+  vec3 start, mid, end;
   {
     vec2 start2d = vec2(0.0);
     float tiltJitter = (tilt + jitter) * PI / 2.0;
@@ -76,10 +73,12 @@ void main()
     vec2 mid2d = mix(start2d, end2d, tiltMidCoef);
     mid2d += bend * orth(end2d - start2d);
     vec2 tmp = facing;
-    start = vec3(tmp * start2d.x, start2d.y).xzy;
+    start = vec3(0);
     mid = vec3(tmp * mid2d.x, mid2d.y).xzy;
     end = vec3(tmp * end2d.x, end2d.y).xzy;
   }
+
+  uint vInd = gl_VertexIndex;
   uint yInd = vInd / 2;
   uint xInd = vInd % 2;
   float t = (1.0 / 7.0 * float(yInd));
