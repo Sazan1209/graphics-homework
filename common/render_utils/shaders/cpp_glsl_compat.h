@@ -10,13 +10,15 @@
 
 #define SHADER_NAMESPACE(name) namespace name {
 #define SHADER_NAMESPACE_END }
+#define CPU_ONLY(val) val
 
 // NOLINTBEGIN
 
 // NOTE: This is technically completely wrong,
 // as GLSL words are guaranteed to be 32-bit,
 // while C++ unsigned int can be 16-bit.
-using shader_uint = glm::uint;
+using shader_int = int32_t;
+using shader_uint = glm::uint32;
 using shader_uvec2 = glm::uvec2;
 using shader_uvec3 = glm::uvec3;
 
@@ -36,8 +38,9 @@ using shader_bool = glm::uint;
 
 #define SHADER_NAMESPACE(name)
 #define SHADER_NAMESPACE_END
+#define CPU_ONLY(val)
 
-
+#define shader_int int
 #define shader_uint uint
 #define shader_uvec2 uvec2
 

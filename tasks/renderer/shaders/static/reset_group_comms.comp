@@ -1,0 +1,17 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "static.h"
+
+layout(binding = 0, std430) restrict buffer resetGroupComms_buf
+{
+  GroupREIndirectCommand comms[];
+};
+
+void main(){
+  uint ind = gl_GlobalInvocationID.x;
+  if (ind >= comms.length()){
+    return;
+  }
+  comms[ind].command.instanceCount = 0;
+}

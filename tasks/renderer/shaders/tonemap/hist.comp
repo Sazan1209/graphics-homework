@@ -8,7 +8,7 @@ layout(local_size_x = 32, local_size_y = 32) in;
 // needed to decrease the amount of between group syncing
 shared uint localBuckets[bucketCount];
 
-layout(binding = 0, r11f_g11f_b10f) restrict readonly uniform image2D image;
+layout(binding = 0, r32f) restrict readonly uniform image2D image;
 layout(binding = 1, std430) coherent buffer A
 {
   float minLum;
@@ -39,12 +39,10 @@ void main()
     localBuckets[ind] = 0;
   }
   barrier();
-  const vec3 pixel = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).xyz;
-  const float lum = dot(pixel, lumVec);
+  const float lum = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).x;
 
   atomicAdd(localBuckets[bucketFromLum(lum)], 1);
   barrier();
-  memoryBarrierShared();
   if (ind < bucketCount)
   {
     atomicAdd(outputBuf[ind], localBuckets[ind]);

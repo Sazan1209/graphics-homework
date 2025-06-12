@@ -8,7 +8,8 @@
 #include <etna/GpuSharedResource.hpp>
 #include <glm/glm.hpp>
 
-#include "scene/SceneManager.hpp"
+#include "StaticMeshRenderer.hpp"
+#include "GrassRenderer.hpp"
 #include "wsi/Keyboard.hpp"
 
 #include "FramePacket.hpp"
@@ -18,7 +19,7 @@
 class WorldRenderer
 {
 public:
-  WorldRenderer(const etna::GpuWorkCount& workCount);
+  WorldRenderer() = default;
 
   void loadScene(std::filesystem::path path);
 
@@ -32,18 +33,15 @@ public:
   void renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_image);
 
 private:
-  void renderScene(
-    vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
   void createTerrainMap(vk::CommandBuffer cmd_buf);
   void renderTerrain(vk::CommandBuffer cmd_buf);
   void renderCube(vk::CommandBuffer cmd_buf);
   void tonemap(vk::CommandBuffer cmd_buf);
   void resolve(vk::CommandBuffer cmd_buf);
 
-  bool shouldCull(glm::mat4 mModel, BoundingBox box);
-
 private:
-  std::unique_ptr<SceneManager> sceneMgr;
+  StaticMeshRenderer staticRenderer;
+  GrassRenderer grassRenderer;
 
   etna::Image heightMap;
   etna::Image normalMap;
@@ -51,20 +49,19 @@ private:
 
   struct
   {
-    etna::Image color;
-    etna::Image normal;
-    etna::Image depthStencil;
+    etna::Image colorMetallic;
+    etna::Image normalOcclusion;
+    etna::Image emissiveRoughness; // reused as luminances
+    etna::Image depth;
   } gBuffer;
 
   etna::Image tonemapDownscaledImage;
   etna::Buffer tonemapHist;
-  etna::GpuSharedResource<etna::Buffer> modelMatrices;
   etna::Sampler defaultSampler;
 
   glm::mat4x4 worldViewProj;
   glm::vec3 eye;
 
-  etna::GraphicsPipeline staticMeshPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
   etna::ComputePipeline tonemapDownscalePipeline{};
   etna::ComputePipeline tonemapMinmaxPipeline{};
@@ -81,22 +78,21 @@ private:
     glm::vec3 eye;
   };
 
-
   float sunlightAngles[2] = {30.0f, 0.0f};
   struct
   {
     resolve::Sunlight sunlight = {
-      glm::vec3(1.0 / 2, -glm::sqrt(3.0) / 2.0, 0), 0.0, glm::vec3(1, 1, 1), 0.05};
+      glm::vec3(1.0 / 2, -glm::sqrt(3.0) / 2.0, 0), 1.0, glm::vec3(1, 1, 1), 0.05};
 
-    glm::vec3 skyColor = glm::vec3(135, 206, 235) / 255.0f;
-    float lightExponent = 1.0f;
+    glm::vec3 skyColor = glm::vec3(0, 181, 226) / 255.0f;
+    float near;
 
     glm::mat4 mView;
 
-    float near;
     float far;
     float tanFov;
-    float attenuationCoef = 0.005;
+    float attenuationCoef = 0.05;
+    float padding;
   } resolveUniformParams;
 
   struct

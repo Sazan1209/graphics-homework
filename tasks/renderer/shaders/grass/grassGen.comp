@@ -1,0 +1,166 @@
+#version 430
+
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 64) in;
+
+#include "grass.glsl"
+
+// grass blade
+
+// POR - point of origin
+// xInd, yInd
+
+layout(push_constant, std430) uniform grassvert_pc
+{
+  mat4 VfW;
+  vec3 eyePos;
+  float maxRandomOffset;
+  uint ring;
+  float tilt;
+  float grassHeight;
+  float windAngle;
+  float windAlignForce;
+};
+
+// grass position and facing generation
+// culling
+// height generation
+//
+
+layout(binding = 0) uniform sampler2D perlinNoise;
+layout(binding = 1, std430) restrict writeonly buffer grass_gen_buf1
+{
+  GrassInstanceData blades[];
+};
+layout(binding = 2, std430) buffer grass_gen_buf2
+{
+  GrassDrawCallData drawcall;
+};
+
+// Model coordinates from world
+vec2 getMfW(in vec2 wPos)
+{
+  wPos -= centerCoordWorld.xz;
+  wPos.y = -wPos.y;
+  wPos += centerCoordModel.xz;
+  return wPos;
+}
+
+vec3 getMfW(in vec3 wPos)
+{
+  wPos.xz = getMfW(wPos.xz);
+  return wPos;
+}
+
+// The 00 coord for the grass render square centered on the player
+ivec2 findFirstGrassID(vec2 mStartPos)
+{
+  float step = float(1 << ring);
+  vec2 ringCorner = mStartPos - centerSize * step / 2.0;
+  ivec2 cornerXY = ivec2(ceil(ringCorner * totalGrassCount / (step * terrainSize)));
+  return cornerXY << ring;
+}
+
+// texture coords from model
+vec2 getTfM(vec2 mPos)
+{
+  return mPos / terrainSize;
+}
+
+vec2 getMfI(ivec2 iPos)
+{
+  return vec2(iPos) / grassPerMeter;
+}
+
+vec3 getWfM(vec3 mPos)
+{
+  mPos -= centerCoordModel;
+  mPos.z = -mPos.z;
+  mPos += centerCoordWorld;
+  return mPos;
+}
+
+ivec2 getRfIndex(int index)
+{
+  ivec2 iGrassCount = ivec2(centerGrassCount);
+
+  if (ring != 0)
+  {
+    int add = index - (iGrassCount.y + 1) * iGrassCount.x / 4 + 1;
+    add = max(add, 0);
+    int w_half = iGrassCount.x / 2;
+    add = (add + (w_half - 1)) / w_half;
+    add *= w_half;
+    add = min((iGrassCount.x * iGrassCount.y) / 4, add);
+    index += add;
+  }
+  return ivec2(index % iGrassCount.x, index / iGrassCount.x);
+}
+
+float alignWind(float angle, float dir)
+{
+  return mix(angle, dir, windAlignForce);
+}
+
+void main()
+{
+  const int index = int(gl_GlobalInvocationID.x);
+  if (index == 0)
+  {
+    drawcall.comm.vertexCount = ring <= 1 ? 15 : 7;
+  }
+
+  vec2 mEye = getMfW(eyePos.xz);
+  ivec2 rIndex = getRfIndex(index);
+  ivec2 iPos = findFirstGrassID(mEye) + (rIndex << ring);
+  if (any(lessThan(iPos, ivec2(0))) || any(greaterThan(iPos, totalGrassCount)))
+  {
+    return;
+  }
+
+  uint n = (iPos.y * 7) ^ (iPos.x);
+  vec2 jitter = (vec2(rand(n), rand(n)) - 0.5) * maxRandomOffset;
+
+  vec2 mPos2D = getMfI(iPos) + jitter;
+  vec2 tPos = getTfM(mPos2D);
+  float height = texture(perlinNoise, tPos).x;
+
+  vec3 mPos3D = vec3(mPos2D, height).xzy;
+  vec3 wPos3D = getWfM(mPos3D);
+
+  GrassInstanceData blade;
+  blade.pos = wPos3D;
+  blade.facing = alignWind((rand(n) - 0.5f) * 2.0 * PI, windAngle * PI);
+  blade.hash = n;
+  {
+    vec2 diff = abs(wPos3D.xz - eyePos.xz);
+    float dist = max(diff.x, diff.y);
+    blade.lod = min(1.0f, centerSize.x / (4.0 * dist));
+  }
+  blade.shouldDissapear = any(notEqual(iPos & ivec2(1 << ring), ivec2(0)));
+  blade.ring = float(ring);
+
+  {
+    bool curr = false;
+    float angle = tilt * PI / 2.0;
+    vec2 facing = vec2(sin(blade.facing), cos(blade.facing));
+    vec3 offset = vec3(facing * sin(angle), cos(angle)).xzy * grassHeight;
+
+    vec4 p = VfW * vec4(wPos3D, 1.0);
+    p /= p.w + grassHeight;
+    curr = curr || all(greaterThan(p.xyz, vec3(-1, -1, 0))) && all(lessThan(p.xyz, vec3(1, 1, 1)));
+
+    p = VfW * vec4(wPos3D + offset, 1.0);
+    p /= p.w + grassHeight;
+    curr = curr || all(greaterThan(p.xyz, vec3(-1, -1, 0))) && all(lessThan(p.xyz, vec3(1, 1, 1)));
+
+    if (!curr)
+    {
+      return;
+    }
+  }
+
+  uint writeIndex = atomicAdd(drawcall.comm.instanceCount, 1);
+  blades[writeIndex] = blade;
+}
