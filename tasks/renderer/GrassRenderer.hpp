@@ -18,9 +18,12 @@ public:
 
   void update(glm::mat4 matrDfW_, float time_, glm::vec3 eyePos_)
   {
+    float delta = time_ - renderPc.time;
     renderPc.mDfW = matrDfW_;
     renderPc.eyePos = eyePos_;
     renderPc.time = time_;
+    float angleRad = glm::radians(360.0f * genPc.windAngle);
+    renderPc.windPos += glm::vec2(glm::sin(angleRad), glm::cos(angleRad)) * delta * windSpeed;
     genPc.mDfW = matrDfW_;
     genPc.eyePos = eyePos_;
   }
@@ -33,24 +36,38 @@ private:
   {
     glm::mat4 mDfW;
     glm::vec3 eyePos;
-    float bend = .2;
-    float tilt = glm::radians(15.0);
-    float width = 0.02;
-    float height = 0.6;
-    float midCoef = 3.0 / 4.0;
-    float time = 0.0;
-    float jitterCoef = 0.1;
-    float alignCoef = 0.7;
+    float bend = .1;
+
+    glm::vec2 windPos = {0.0f, 0.0f};
+    float tilt = 0.05f;
+    float width = 0.03f;
+
+    float height = 1.0f;
+    float midCoef = 3.0f / 4.0f;
+    float time = 0.0f;
+    float jitterCoef = 0.1f;
+
+    float alignCoef = 0.7f;
+    float windChopSize = 8.0f;
+    float windTiltStrength = 0.8f;
   } renderPc;
 
-  struct GenPushConst{
+  struct GenPushConst
+  {
     glm::mat4 mDfW;
+
     glm::vec3 eyePos;
-    float maxJitter = 0.1;
+    float maxRandomOffset = 1.0f;
+
     uint ring;
     float tilt;
     float height;
+    float windAngle = 0;
+
+    float windAlignForce = 0.5;
   } genPc;
+
+  float windSpeed = 4.0;
 
   etna::GraphicsPipeline grassRenderPipeline;
   etna::ComputePipeline grassGenPipeline;

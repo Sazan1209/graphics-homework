@@ -159,8 +159,7 @@ void GrassRenderer::prepareForRender(vk::CommandBuffer cmd_buf, etna::Image& hei
 void GrassRenderer::renderScene(vk::CommandBuffer cmd_buf)
 {
   ETNA_PROFILE_GPU(cmd_buf, render_grass);
-  float oldWidth = renderPc.width;
-  for (uint32_t i = 0, offset = 0; i <= grass::ringCount; ++i, renderPc.width *= 2.0f)
+  for (uint32_t i = 0, offset = 0; i <= grass::ringCount; ++i)
   {
     uint32_t count = grass::centerGrassCount.x * grass::centerGrassCount.y;
     if (i != 0)
@@ -188,7 +187,6 @@ void GrassRenderer::renderScene(vk::CommandBuffer cmd_buf)
 
     cmd_buf.drawIndirect(grassDrawcallData.get(), i * sizeof(grass::GrassDrawCallData), 1, 0);
   }
-  renderPc.width = oldWidth;
 }
 
 void GrassRenderer::drawGui()
@@ -201,10 +199,15 @@ void GrassRenderer::drawGui()
     ImGui::InputFloat("Tilt", &renderPc.tilt);
     ImGui::InputFloat("Width", &renderPc.width);
     ImGui::InputFloat("Jitter", &renderPc.jitterCoef);
-    ImGui::InputFloat("Force align", &renderPc.alignCoef);
+    ImGui::InputFloat("Screen align", &renderPc.alignCoef);
+    ImGui::InputFloat("Max offset", &genPc.maxRandomOffset);
   }
-  if (ImGui::CollapsingHeader("Grass Gen"))
+
+  if (ImGui::CollapsingHeader("Wind"))
   {
-    ImGui::InputFloat("Grass position jitter", &genPc.maxJitter);
+    ImGui::InputFloat("Facing influence", &genPc.windAlignForce);
+    ImGui::InputFloat("Direction", &genPc.windAngle);
+    ImGui::InputFloat("Speed", &windSpeed);
+    ImGui::InputFloat("Tilt influence", &renderPc.windTiltStrength);
   }
 }

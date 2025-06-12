@@ -11,7 +11,8 @@ struct GrassInstanceData
   shader_float facing;
   shader_uint hash;
   shader_float lod;
-  CPU_ONLY(float padding[2];)
+  shader_bool shouldDissapear;
+  shader_float ring;
 };
 
 struct Command
@@ -28,7 +29,7 @@ struct GrassDrawCallData
 };
 
 const shader_uint ringCount = 2;
-const shader_uvec2 centerGrassCount = shader_uvec2(256, 256);
+const shader_uvec2 centerGrassCount = shader_uvec2(512, 512);
 
 SHADER_NAMESPACE_END
 

@@ -19,6 +19,8 @@ layout(push_constant, std430) uniform grassvert_pc
   uint ring;
   float tilt;
   float grassHeight;
+  float windAngle;
+  float windAlignForce;
 };
 
 // grass position and facing generation
@@ -54,10 +56,10 @@ vec3 getMfW(in vec3 wPos)
 // The 00 coord for the grass render square centered on the player
 ivec2 findFirstGrassID(vec2 mStartPos)
 {
-  const int step = (1 << ring);
-  ivec2 iStartPos = ivec2((mStartPos / terrainSize) * totalGrassCount / float(step)) << ring;
-  ivec2 cornerXY = max(iStartPos - (ivec2(centerGrassCount / 2.0) << ring), ivec2(0));
-  return cornerXY;
+  float step = float(1 << ring);
+  vec2 ringCorner = mStartPos - centerSize * step / 2.0;
+  ivec2 cornerXY = ivec2(ceil(ringCorner * totalGrassCount / (step * terrainSize)));
+  return cornerXY << ring;
 }
 
 // texture coords from model
@@ -85,7 +87,7 @@ ivec2 getRfIndex(int index)
 
   if (ring != 0)
   {
-    int add = index - (iGrassCount.y + 1) * iGrassCount.x / 4;
+    int add = index - (iGrassCount.y + 1) * iGrassCount.x / 4 + 1;
     add = max(add, 0);
     int w_half = iGrassCount.x / 2;
     add = (add + (w_half - 1)) / w_half;
@@ -96,13 +98,26 @@ ivec2 getRfIndex(int index)
   return ivec2(index % iGrassCount.x, index / iGrassCount.x);
 }
 
+float alignWind(float angle, float dir)
+{
+  return mix(angle, dir, windAlignForce);
+}
+
 void main()
 {
   const int index = int(gl_GlobalInvocationID.x);
+  if (index == 0)
+  {
+    drawcall.comm.vertexCount = ring <= 1 ? 15 : 7;
+  }
 
   vec2 mEye = getMfW(eyePos.xz);
-
-  ivec2 iPos = findFirstGrassID(mEye) + (getRfIndex(index) << ring);
+  ivec2 rIndex = getRfIndex(index);
+  ivec2 iPos = findFirstGrassID(mEye) + (rIndex << ring);
+  if (any(lessThan(iPos, ivec2(0))) || any(greaterThan(iPos, totalGrassCount)))
+  {
+    return;
+  }
 
   uint n = (iPos.y * 7) ^ (iPos.x);
   vec2 jitter = (vec2(rand(n), rand(n)) - 0.5) * maxRandomOffset;
@@ -114,14 +129,17 @@ void main()
   vec3 mPos3D = vec3(mPos2D, height).xzy;
   vec3 wPos3D = getWfM(mPos3D);
 
-  if (index == 0){
-    drawcall.comm.vertexCount = 15;
-  }
-
   GrassInstanceData blade;
   blade.pos = wPos3D;
-  blade.facing = rand(n) * 2.0 * PI;
+  blade.facing = alignWind((rand(n) - 0.5f) * 2.0 * PI, windAngle * PI);
   blade.hash = n;
+  {
+    vec2 diff = abs(wPos3D.xz - eyePos.xz);
+    float dist = max(diff.x, diff.y);
+    blade.lod = min(1.0f, centerSize.x / (4.0 * dist));
+  }
+  blade.shouldDissapear = any(notEqual(iPos & ivec2(1 << ring), ivec2(0)));
+  blade.ring = float(ring);
 
   {
     bool curr = false;
