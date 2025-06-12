@@ -20,5 +20,5 @@ void main(){
   out_normalOcclusion.w = mix(0.3, 1.0, in_t);
   out_emissiveRoughness.xyz = vec3(0);
   float coef = clamp((abs(in_x) - 0.3) * 3, 0.0, 1.0);
-  out_emissiveRoughness.w = mix(0.8, 0.6, coef);
+  out_emissiveRoughness.w = mix(0.7, 0.5, coef);
 }
