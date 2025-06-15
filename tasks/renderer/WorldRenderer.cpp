@@ -32,7 +32,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .name = "gBuffer.depth",
     .format = vk::Format::eD32Sfloat,
     .imageUsage =
-      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eStorage,
+      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
   });
 
   gBuffer.normal = ctx.createImage(etna::Image::CreateInfo{
@@ -398,8 +398,8 @@ void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
     cmd_buf,
     gBuffer.depth.get(),
     vk::PipelineStageFlagBits2::eComputeShader,
-    vk::AccessFlagBits2::eShaderStorageRead,
-    vk::ImageLayout::eGeneral,
+    vk::AccessFlagBits2::eShaderSampledRead,
+    vk::ImageLayout::eShaderReadOnlyOptimal,
     vk::ImageAspectFlagBits::eDepth);
   etna::set_state(
     cmd_buf,
@@ -411,7 +411,8 @@ void WorldRenderer::resolve(vk::CommandBuffer cmd_buf)
   etna::flush_barriers(cmd_buf);
 
   auto binding0 = gBuffer.color.genBinding({}, vk::ImageLayout::eGeneral, {});
-  auto binding1 = gBuffer.depth.genBinding({}, vk::ImageLayout::eGeneral, {});
+  auto binding1 =
+    gBuffer.depth.genBinding(defaultSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal, {});
   auto binding2 = gBuffer.normal.genBinding({}, vk::ImageLayout::eGeneral, {});
   auto binding3 = lightList.genBinding();
   auto binding4 = resolveUniformParamsBuffer.genBinding();
