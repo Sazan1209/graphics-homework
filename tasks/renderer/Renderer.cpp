@@ -142,7 +142,7 @@ void Renderer::drawFrame()
     {
       ETNA_PROFILE_GPU(currentCmdBuf, renderFrame);
 
-      worldRenderer->renderWorld(currentCmdBuf, image);
+      worldRenderer->renderWorld(currentCmdBuf, image, view);
 
       etna::set_state(
         currentCmdBuf,

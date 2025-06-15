@@ -25,7 +25,7 @@ void WorldRenderer::allocateResources(glm::uvec2 swapchain_resolution)
     .name = "gBuffer_colorMetallic_or_color",
     .format = vk::Format::eA8B8G8R8SrgbPack32,
     .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eStorage |
-      vk::ImageUsageFlagBits::eTransferSrc,
+      vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled,
     .flags = vk::ImageCreateFlagBits::eMutableFormat | vk::ImageCreateFlagBits::eExtendedUsage,
   });
 
@@ -112,6 +112,10 @@ void WorldRenderer::loadShaders()
     "cube",
     {COMPLETE_RENDERER_SHADERS_ROOT "cube.frag.spv",
      COMPLETE_RENDERER_SHADERS_ROOT "cube.vert.spv"});
+  etna::create_program(
+    "fxaa",
+    {COMPLETE_RENDERER_SHADERS_ROOT "fxaa.frag.spv",
+     COMPLETE_RENDERER_SHADERS_ROOT "fxaa.vert.spv"});
 }
 
 void WorldRenderer::setupPipelines()
@@ -198,6 +202,23 @@ void WorldRenderer::setupPipelines()
           },
       });
 
+  fxaaPipeline = pipelineManager.createGraphicsPipeline(
+    "fxaa",
+    etna::GraphicsPipeline::CreateInfo{
+      .depthConfig =
+        {
+          .depthTestEnable = vk::False,
+          .depthWriteEnable = vk::False,
+        },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats =
+            {
+              vk::Format::eB8G8R8A8Srgb,
+            },
+        },
+    });
+
   tonemapDownscalePipeline = pipelineManager.createComputePipeline("tonemap_downscale", {});
   tonemapMinmaxPipeline = pipelineManager.createComputePipeline("tonemap_minmax", {});
   tonemapEqualizePipeline = pipelineManager.createComputePipeline("tonemap_equalize", {});
@@ -261,11 +282,19 @@ void WorldRenderer::drawGui()
     ImGui::InputFloat("Strength", &resolveUniformParams.sunlight.strength);
     ImGui::ColorPicker3("Color", (float*)&resolveUniformParams.sunlight.color);
   }
+  if (ImGui::CollapsingHeader("Fxaa"))
+  {
+    ImGui::Checkbox("Enable FXAA", &useFxaa);
+    ImGui::InputFloat("Subpix", &fxaaPushConstants.subpix);
+    ImGui::InputFloat("Edge threshold", &fxaaPushConstants.edgeThreshold);
+    ImGui::InputFloat("Edge threshold min", &fxaaPushConstants.edgeThresholdMin);
+  }
   grassRenderer.drawGui();
   ImGui::End();
 }
 
-void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_image)
+void WorldRenderer::renderWorld(
+  vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
 {
   ETNA_PROFILE_GPU(cmd_buf, renderWorld);
   staticRenderer.prepareForRender(cmd_buf);
@@ -325,6 +354,69 @@ void WorldRenderer::renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_imag
   resolve(cmd_buf);
 
   tonemap(cmd_buf);
+  if (useFxaa)
+  {
+    fxaaPresent(cmd_buf, target_image, target_image_view);
+  }
+  else
+  {
+    present(cmd_buf, target_image);
+  }
+}
+
+void WorldRenderer::fxaaPresent(
+  vk::CommandBuffer cmd_buf, vk::Image target_image, vk::ImageView target_image_view)
+{
+  ETNA_PROFILE_GPU(cmd_buf, fxaa);
+  etna::set_state(
+    cmd_buf,
+    gBuffer.colorMetallic.get(),
+    vk::PipelineStageFlagBits2::eFragmentShader,
+    vk::AccessFlagBits2::eShaderSampledRead,
+    vk::ImageLayout::eShaderReadOnlyOptimal,
+    vk::ImageAspectFlagBits::eColor);
+
+  etna::set_state(
+    cmd_buf,
+    target_image,
+    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    vk::AccessFlagBits2::eColorAttachmentWrite,
+    vk::ImageLayout::eColorAttachmentOptimal,
+    vk::ImageAspectFlagBits::eColor);
+  etna::flush_barriers(cmd_buf);
+  etna::RenderTargetState renderTargets(
+    cmd_buf,
+    {{0, 0}, {resolution.x, resolution.y}},
+    {
+      {.image = target_image, .view = target_image_view, .loadOp = vk::AttachmentLoadOp::eDontCare},
+    },
+    {});
+
+
+  auto info = etna::get_shader_program("fxaa");
+
+  auto bind0 = gBuffer.colorMetallic.genBinding(
+    defaultSampler.get(),
+    vk::ImageLayout::eShaderReadOnlyOptimal,
+    {.format = vk::Format::eA8B8G8R8UnormPack32});
+
+  auto descSet =
+    etna::create_descriptor_set(info.getDescriptorLayoutId(0), cmd_buf, {etna::Binding{0, bind0}});
+  auto vkSet = descSet.getVkSet();
+  auto layout = fxaaPipeline.getVkPipelineLayout();
+
+  cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, fxaaPipeline.getVkPipeline());
+  cmd_buf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, 1, &vkSet, 0, nullptr);
+
+  fxaaPushConstants.rcpFrame = 1.0f / glm::vec2(resolution);
+  cmd_buf.pushConstants<decltype(fxaaPushConstants)>(
+    layout, vk::ShaderStageFlagBits::eFragment, 0, fxaaPushConstants);
+
+  cmd_buf.draw(3, 1, 0, 0);
+}
+
+void WorldRenderer::present(vk::CommandBuffer cmd_buf, vk::Image target_image)
+{
 
   etna::set_state(
     cmd_buf,
@@ -727,6 +819,7 @@ void WorldRenderer::tonemap(vk::CommandBuffer cmd_buf)
       &vkSet,
       0,
       nullptr);
+    tonemapPushConstants.useFxaa = useFxaa;
     cmd_buf.pushConstants<decltype(tonemapPushConstants)>(
       tonemapPipeline.getVkPipelineLayout(),
       vk::ShaderStageFlagBits::eCompute,
