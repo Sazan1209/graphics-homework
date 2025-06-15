@@ -1,0 +1,4 @@
+[submodule "deps/etna"]
+	path = deps/etna
+	url = git@github.com:Sazan1209/etna.git
+  branch = my_etna

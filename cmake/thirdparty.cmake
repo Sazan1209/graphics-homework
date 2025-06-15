@@ -19,7 +19,7 @@ find_package(Vulkan 1.3.275 REQUIRED)
 CPMAddPackage(
   NAME ImGui
   GITHUB_REPOSITORY ocornut/imgui
-  GIT_TAG v1.91.0
+  GIT_TAG v1.91.8
   DOWNLOAD_ONLY YES
 )
 
@@ -48,13 +48,6 @@ CPMAddPackage(
     "TINYGLTF_HEADER_ONLY OFF"
     "TINYGLTF_BUILD_LOADER_EXAMPLE OFF"
     "TINYGLTF_INSTALL OFF"
-)
-
-# etna -- our wrapper around Vulkan to make life easier
-CPMAddPackage(
-  NAME etna
-  GITHUB_REPOSITORY AlexandrShcherbakov/etna
-  VERSION 1.7.0
 )
 
 # Type-erased function containers that actually work
