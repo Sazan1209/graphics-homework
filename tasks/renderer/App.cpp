@@ -5,10 +5,10 @@
 
 static glm::vec2 randomGradient(glm::ivec2 coord)
 {
-  const uint w = 32u;
-  const uint s = w / 2u; // rotation width
-  uint a = uint(coord.x);
-  uint b = uint(coord.y);
+  const uint32_t w = 32u;
+  const uint32_t s = w / 2u; // rotation width
+  uint32_t a = uint32_t(coord.x);
+  uint32_t b = uint32_t(coord.y);
   a *= 3284157443u;
   b ^= a << s | a >> (w - s);
   b *= 1911520717u;
