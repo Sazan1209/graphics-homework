@@ -30,6 +30,7 @@ endif()
 
 include("cmake/thirdparty.cmake")
 include("cmake/shaders.cmake")
+add_subdirectory(deps/etna/ SYSTEM)
 
 add_subdirectory(common)
 add_subdirectory(samples)

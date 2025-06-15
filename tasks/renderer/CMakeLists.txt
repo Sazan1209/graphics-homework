@@ -1,18 +1,19 @@
+add_subdirectory(scene/baker/)
+add_subdirectory(scene/scene_manager/)
 
 add_executable(complete_renderer
   main.cpp
   App.cpp
   Renderer.cpp
   WorldRenderer.cpp
+  StaticMeshRenderer.cpp
   TerrainGenerator.cpp
 )
 
 target_link_libraries(complete_renderer
-  PRIVATE glfw etna glm::glm wsi gui scene render_utils)
+  PRIVATE glfw etna glm::glm wsi gui scene render_utils cr_scene)
 
 target_add_shaders(complete_renderer
-  shaders/static_mesh.frag
-  shaders/static_mesh.vert
   shaders/resolve.comp
 
   shaders/terrain/perlin.comp
@@ -29,6 +30,13 @@ target_add_shaders(complete_renderer
   shaders/tonemap/equalize.comp
   shaders/tonemap/cumsum.comp
   shaders/tonemap/tonemap.comp
+
+  shaders/static/cull_group.comp
+  shaders/static/cull_single.comp
+  shaders/static/render.frag
+  shaders/static/render_group.vert
+  shaders/static/render_single.vert
+  shaders/static/reset_group_comms.comp
 
   shaders/cube.frag
   shaders/cube.vert

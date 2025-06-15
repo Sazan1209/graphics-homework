@@ -8,7 +8,7 @@
 #include <etna/GpuSharedResource.hpp>
 #include <glm/glm.hpp>
 
-#include "scene/SceneManager.hpp"
+#include "StaticMeshRenderer.hpp"
 #include "wsi/Keyboard.hpp"
 
 #include "FramePacket.hpp"
@@ -18,7 +18,7 @@
 class WorldRenderer
 {
 public:
-  WorldRenderer(const etna::GpuWorkCount& workCount);
+  WorldRenderer() = default;
 
   void loadScene(std::filesystem::path path);
 
@@ -32,39 +32,32 @@ public:
   void renderWorld(vk::CommandBuffer cmd_buf, vk::Image target_image);
 
 private:
-  void renderScene(
-    vk::CommandBuffer cmd_buf, const glm::mat4x4& glob_tm, vk::PipelineLayout pipeline_layout);
   void createTerrainMap(vk::CommandBuffer cmd_buf);
   void renderTerrain(vk::CommandBuffer cmd_buf);
   void renderCube(vk::CommandBuffer cmd_buf);
   void tonemap(vk::CommandBuffer cmd_buf);
   void resolve(vk::CommandBuffer cmd_buf);
 
-  bool shouldCull(glm::mat4 mModel, BoundingBox box);
-
 private:
-  std::unique_ptr<SceneManager> sceneMgr;
+  StaticMeshRenderer staticRenderer;
 
   etna::Image heightMap;
   etna::Image normalMap;
   etna::Buffer lightList;
 
-  struct
-  {
-    etna::Image color;
+  struct{
     etna::Image normal;
-    etna::Image depthStencil;
+    etna::Image color;
+    etna::Image depth;
   } gBuffer;
 
   etna::Image tonemapDownscaledImage;
   etna::Buffer tonemapHist;
-  etna::GpuSharedResource<etna::Buffer> modelMatrices;
   etna::Sampler defaultSampler;
 
   glm::mat4x4 worldViewProj;
   glm::vec3 eye;
 
-  etna::GraphicsPipeline staticMeshPipeline{};
   etna::GraphicsPipeline terrainPipeline{};
   etna::ComputePipeline tonemapDownscalePipeline{};
   etna::ComputePipeline tonemapMinmaxPipeline{};
