@@ -25,17 +25,35 @@ void Renderer::initVulkan(std::span<const char*> instance_extensions)
 
   deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
+  auto vk12Features = vk::PhysicalDeviceVulkan12Features{
+    .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
+    .descriptorBindingPartiallyBound = VK_TRUE,
+    .descriptorBindingVariableDescriptorCount = VK_TRUE,
+    .runtimeDescriptorArray = VK_TRUE,
+  };
+
+  auto vk11Features =
+    vk::PhysicalDeviceVulkan11Features{.pNext = &vk12Features, .shaderDrawParameters = VK_TRUE};
+
   etna::initialize(etna::InitParams{
     .applicationName = "model_bakery_renderer",
     .applicationVersion = VK_MAKE_VERSION(0, 1, 0),
     .instanceExtensions = instanceExtensions,
     .deviceExtensions = deviceExtensions,
-    .features = vk::PhysicalDeviceFeatures2{.features = {.tessellationShader = true}},
+    .features =
+      vk::PhysicalDeviceFeatures2{
+        .pNext = &vk11Features,
+        .features =
+          {.tessellationShader = VK_TRUE,
+           .multiDrawIndirect = VK_TRUE,
+           .drawIndirectFirstInstance = VK_TRUE},
+      },
     .physicalDeviceIndexOverride = {},
     .numFramesInFlight = numFramesInFlight,
+    .generateBarriersAutomatically = false,
   });
 
-  worldRenderer = std::make_unique<WorldRenderer>(workCount);
+  worldRenderer = std::make_unique<WorldRenderer>();
 }
 
 void Renderer::initFrameDelivery(vk::UniqueSurfaceKHR a_surface, ResolutionProvider res_provider)
@@ -110,15 +128,31 @@ void Renderer::drawFrame()
 
   auto nextSwapchainImage = window->acquireNext();
 
+
   if (nextSwapchainImage)
   {
     auto [image, view, availableSem] = *nextSwapchainImage;
+    // etna::get_context().getResourceTracker().setExternalTextureState(
+    //   image,
+    //   vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    //   vk::AccessFlagBits2::eNone,
+    //   vk::ImageLayout::eUndefined);
 
     ETNA_CHECK_VK_RESULT(currentCmdBuf.begin(vk::CommandBufferBeginInfo{}));
     {
       ETNA_PROFILE_GPU(currentCmdBuf, renderFrame);
 
       worldRenderer->renderWorld(currentCmdBuf, image);
+
+      etna::set_state(
+        currentCmdBuf,
+        image,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageAspectFlagBits::eColor);
+
+      etna::flush_barriers(currentCmdBuf);
 
       {
         ImDrawData* pDrawData = ImGui::GetDrawData();
@@ -129,8 +163,8 @@ void Renderer::drawFrame()
       etna::set_state(
         currentCmdBuf,
         image,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        {},
+        vk::PipelineStageFlagBits2::eAllCommands,
+        vk::AccessFlagBits2::eNone,
         vk::ImageLayout::ePresentSrcKHR,
         vk::ImageAspectFlagBits::eColor);
 
