@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "terrain.glsl"
+#include "../utils.glsl"
 
 layout(vertices = 2) out;
 layout(push_constant) uniform terraintesc_pc
@@ -43,34 +44,31 @@ vec2 calcTexcoord(in uint cornerNum)
 
 float GetTessLevel(in float dist)
 {
-  float coef = 1.0 / (1.0 + dist * tessCoefficient);
+  float coef = 1.0 / (1.0 + dist / halfLodDistance);
   return mix(minTess, maxTess, coef);
 }
 
-bool Cull(vec3 minP, vec3 maxP)
+float distToLine(vec2 p, vec2 start, vec2 end)
 {
+  vec2 dir = end - start;
+  float coord = dot(p - start, dir) / dot(dir, dir);
+  coord = clamp(coord, 0.0, 1.0);
+  return distance(p, start + dir * coord);
+}
 
-  vec3 minV;
-  vec3 maxV;
-  {
-    vec4 proj = mProjView * vec4(minP, 1);
-    proj /= abs(proj.w);
-    minV = proj.xyz;
-    maxV = proj.xyz;
-  }
-  for (uint mask = 1; mask < 8u; ++mask)
-  {
-    vec3 point;
-    for (uint i = 0; i < 3; ++i)
-    {
-      point[i] = ((mask & (1u << i)) > 0) ? maxP[i] : minP[i];
-    }
-    vec4 corner = mProjView * vec4(point, 1);
-    corner /= abs(corner.w);
-    minV = min(minV, corner.xyz);
-    maxV = max(maxV, corner.xyz);
-  }
-  return any(lessThan(maxV, vec3(-1, -1, 0))) || any(greaterThan(minV, vec3(1, 1, 1)));
+float distToSquare(vec2 p, vec2 c00, vec2 c10, vec2 c01)
+{
+  vec2 coord;
+
+  vec2 dir1 = c10 - c00;
+  coord.x = dot(p - c00, dir1) / dot(dir1, dir1);
+
+  vec2 dir2 = c01 - c00;
+  coord.y = dot(p - c00, dir2) / dot(dir2, dir2);
+
+  coord = clamp(coord, vec2(0.0), vec2(1.0));
+
+  return distance(p, c00 + mat2(dir1, dir2) * coord);
 }
 
 void main()
@@ -85,7 +83,7 @@ void main()
   vec3 maxP = corner10;
   maxP.y += zScale;
 
-  if (Cull(minP, maxP))
+  if (Cull(minP, maxP, mProjView))
   {
     for (uint i = 0; i < 4; ++i)
       gl_TessLevelOuter[i] = -1.0;
@@ -95,17 +93,14 @@ void main()
   }
 
   // we only consider the horizontal distance, because the real height of a chunk varies
-  const float dist00 = distance(corner00.xz, eye.xz);
-  const float dist01 = distance(corner01.xz, eye.xz);
-  const float dist10 = distance(corner10.xz, eye.xz);
-  const float dist11 = distance(corner11.xz, eye.xz);
 
-  const float ol0 = min(dist00, dist01);
-  const float ol1 = min(dist00, dist10);
-  const float ol2 = min(dist10, dist11);
-  const float ol3 = min(dist01, dist11);
+  const float ol0 = distToLine(eye.xz, corner00.xz, corner01.xz);
+  const float ol1 = distToLine(eye.xz, corner00.xz, corner10.xz);
+  const float ol2 = distToLine(eye.xz, corner10.xz, corner11.xz);
+  const float ol3 = distToLine(eye.xz, corner01.xz, corner11.xz);
 
-  const float centerDist = min(ol0, ol3);
+  const float centerDist = distToSquare(eye.xz, corner00.xz, corner01.xz, corner10.xz);
+
 
   gl_TessLevelOuter[0] = GetTessLevel(ol0);
   gl_TessLevelOuter[1] = GetTessLevel(ol1);

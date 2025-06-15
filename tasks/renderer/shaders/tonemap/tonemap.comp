@@ -2,15 +2,19 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "tonemap.glsl"
+#include "../utils.glsl"
+#include "../fxaa_defines.glsl"
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(push_constant) uniform terraintest_pc{
   bool forceLinear;
+  bool useFxaa;
 };
 
-layout(binding = 0, r11f_g11f_b10f) restrict uniform image2D image;
-layout(binding = 1, std430) buffer A
+layout(binding = 0, rgba8) restrict uniform image2D image;
+layout(binding = 1, r32f) restrict readonly uniform image2D lums;
+layout(binding = 2, std430) buffer A
 {
   float minLum;
   float maxLum;
@@ -25,13 +29,13 @@ void main()
     return;
   }
 
-  vec3 pixel = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).xyz;
+  vec3 pixel = toLinear(imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).xyz);
+  const float lum = imageLoad(lums, ivec2(gl_GlobalInvocationID.xy)).x;
 
-  const float lum = dot(pixel, lumVec);
   // linear interpolation
   if (forceLinear || maxLum / minLum <= maxScreenLum / minScreenLum)
   {
-    pixel = (pixel / maxLum);
+    pixel = pixel * (lum / maxLum);
   }
   else
   {
@@ -49,8 +53,14 @@ void main()
     const float diff = mix(distrPrev, distr, coef);
 
     const float resB = mix(minScreenB, maxScreenB, diff);
-    pixel = pixel * exp(resB) / lum;
+    pixel = pixel * exp(resB);
   }
-  pixel = pow(pixel, vec3(2.2));
-  imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(pixel, 1.0));
+
+  vec3 colorSRGB = fromLinear(pixel);
+#if (FXAA_GREEN_AS_LUMA == 0)
+  float fxaaLum = useFxaa ? dot(colorSRGB, vec3(0.299, 0.587, 0.114)) : 1.0;
+  imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(colorSRGB, fxaaLum));
+#else
+  imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(colorSRGB, 1.0));
+#endif
 }

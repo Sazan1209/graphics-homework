@@ -2,14 +2,19 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive : require
 
-layout(location = 0) out vec4 outColor;
-layout(location = 1) out vec4 outNormal;
+#include "../utils.glsl"
+
 layout(binding = 1) uniform sampler2D normalMap;
 
 layout(location = 0) in vec2 inTexCoord;
 
-const vec3 grass = vec3(72, 140, 49) / 255.0;
-const vec3 dirt = vec3(136, 102, 59) / 255.0;
+
+layout(location = 0) out vec4 out_colorMetallic;
+layout(location = 1) out vec4 out_normalOcclusion;
+layout(location = 2) out vec4 out_emissiveRoughness;
+
+const vec3 grass = vec3(0, 154, 23) / 255.0;
+const vec3 dirt = vec3(0.61,0.46,0.33);
 const float degree = 0.7;
 
 void main()
@@ -18,9 +23,12 @@ void main()
   // Model to World translation
   wNorm.z = -wNorm.z;
 
-  const vec3 surfaceColor = wNorm.y >= degree ? grass : dirt;
+  const vec3 surfaceColor = wNorm.y >= degree ? toLinear(grass) : toLinear(dirt);
 
-  outColor.rgb = surfaceColor;
-  outColor.a = 1.0f;
-  outNormal.xyz = wNorm.xyz;
+  out_colorMetallic.rgb = surfaceColor;
+  out_colorMetallic.a = 0.0f;
+  out_normalOcclusion.xyz = wNorm.xyz;
+  out_normalOcclusion.w = wNorm.y >= degree ? 0.0f : 1.0f;
+  out_emissiveRoughness.xyz = vec3(0);
+  out_emissiveRoughness.w = wNorm.y >= degree ? 1.0f : 1.0f;
 }
