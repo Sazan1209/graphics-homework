@@ -515,7 +515,6 @@ void StaticMeshRenderer::createDescSet()
     textureSet = etna::unwrap_vk_result(device.allocateDescriptorSets(setAllocInfo))[0];
   }
   {
-    etna::Sampler sampler(etna::Sampler::CreateInfo{.name = "SM_DefaultSampler"});
     std::vector<vk::DescriptorImageInfo> imageInfos;
     imageInfos.reserve(textures.size());
     for (auto& texture : textures)

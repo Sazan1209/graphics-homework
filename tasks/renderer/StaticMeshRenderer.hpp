@@ -9,6 +9,7 @@
 #include <etna/ComputePipeline.hpp>
 #include <etna/Image.hpp>
 #include <etna/DescriptorSet.hpp>
+#include <etna/Sampler.hpp>
 
 class StaticMeshRenderer
 {
@@ -25,7 +26,6 @@ public:
   void renderScene(vk::CommandBuffer cmd_buf);
 
 private:
-
   void createDescSet();
 
   etna::Buffer vertexData;
@@ -59,6 +59,7 @@ private:
   vk::DescriptorSetLayout textureSetLayout;
 
   glm::mat4 matrVfW{};
+  etna::Sampler sampler{etna::Sampler::CreateInfo{.name = "SM_DefaultSampler"}};
 
   constexpr static size_t MAX_DESCRIPTOR_NUM = 128;
 };
